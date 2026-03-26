@@ -1,0 +1,90 @@
+import Database from "better-sqlite3";
+import fs from "fs";
+import path from "path";
+import os from "os";
+import type { AppSettings } from "./types";
+
+// ─── Paths ────────────────────────────────────────────────────────────────────
+
+const DATA_DIR = path.join(os.homedir(), ".weekly-pulse");
+const DB_PATH = path.join(DATA_DIR, "weekly-pulse.db");
+const SCHEMA_PATH = path.join(process.cwd(), "src/lib/db/schema.sql");
+
+// ─── Singleton ────────────────────────────────────────────────────────────────
+
+let _db: Database.Database | null = null;
+
+export function getDb(): Database.Database {
+  if (_db) return _db;
+
+  // Ensure data directory exists
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+
+  _db = new Database(DB_PATH);
+
+  // Performance & integrity settings (same pattern as PM Pulse)
+  _db.pragma("journal_mode = WAL");
+  _db.pragma("foreign_keys = ON");
+  _db.pragma("synchronous = NORMAL");
+
+  // Apply schema on first run (idempotent — all CREATE IF NOT EXISTS)
+  const schema = fs.readFileSync(SCHEMA_PATH, "utf-8");
+  _db.exec(schema);
+
+  return _db;
+}
+
+// ─── Settings ─────────────────────────────────────────────────────────────────
+
+const SETTING_DEFAULTS: AppSettings = {
+  ics_url: "",
+  calendar_sync_enabled: false,
+  hook_capture_enabled: true,
+};
+
+export function loadSettings(): AppSettings {
+  try {
+    const db = getDb();
+    const rows = db.prepare("SELECT key, value FROM settings").all() as {
+      key: string;
+      value: string;
+    }[];
+    const map: Record<string, string> = {};
+    for (const row of rows) map[row.key] = row.value;
+
+    return {
+      ics_url: map.ics_url ?? SETTING_DEFAULTS.ics_url,
+      calendar_sync_enabled:
+        (map.calendar_sync_enabled ?? "false") === "true",
+      hook_capture_enabled:
+        (map.hook_capture_enabled ?? "true") === "true",
+    };
+  } catch {
+    return { ...SETTING_DEFAULTS };
+  }
+}
+
+export function saveSetting(key: string, value: string): void {
+  const db = getDb();
+  db.prepare(
+    `INSERT INTO settings (key, value, updated_at)
+     VALUES (?, ?, datetime('now'))
+     ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`
+  ).run(key, value);
+}
+
+// ─── Date Helpers ─────────────────────────────────────────────────────────────
+
+/** Returns the Monday of the week containing `date` as YYYY-MM-DD */
+export function getWeekStart(date: Date = new Date()): string {
+  const d = new Date(date);
+  const day = d.getDay(); // 0 = Sun, 1 = Mon, …
+  const diff = day === 0 ? -6 : 1 - day; // adjust to Monday
+  d.setDate(d.getDate() + diff);
+  return d.toISOString().slice(0, 10);
+}
+
+/** Returns YYYY-MM-DD for a given Date */
+export function toDateStr(date: Date = new Date()): string {
+  return date.toISOString().slice(0, 10);
+}

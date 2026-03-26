@@ -1,0 +1,23 @@
+# dependencies
+node_modules/
+
+# Next.js
+.next/
+out/
+
+# database (local only, never synced)
+*.db
+*.db-shm
+*.db-wal
+~/.weekly-pulse/
+
+# env files
+.env
+.env.local
+.env*.local
+
+# OS
+.DS_Store
+
+# debug
+npm-debug.log*
