@@ -30,16 +30,18 @@ export function generateWeeklySummary(weekStart?: string): WeeklySummaryData {
     )
     .all(ws) as CalendarEvent[];
 
-  // Partition entries by type
-  const highlights: SummaryItem[] = entries
+  // Partition entries by type — exclude hook-captured entries from summary
+  const manualEntries = entries.filter((e) => e.source !== "hook");
+
+  const highlights: SummaryItem[] = manualEntries
     .filter((e) => e.type === "highlight")
     .map((e) => ({ content: e.content, source: e.source, date: e.entry_date }));
 
-  const lowlights: SummaryItem[] = entries
+  const lowlights: SummaryItem[] = manualEntries
     .filter((e) => e.type === "lowlight")
     .map((e) => ({ content: e.content, source: e.source, date: e.entry_date }));
 
-  const blockers: SummaryItem[] = entries
+  const blockers: SummaryItem[] = manualEntries
     .filter((e) => e.type === "blocker")
     .map((e) => ({ content: e.content, source: e.source, date: e.entry_date }));
 
@@ -56,7 +58,7 @@ export function generateWeeklySummary(weekStart?: string): WeeklySummaryData {
   ]);
 
   const stats: WeekStats = {
-    total_entries: entries.length,
+    total_entries: manualEntries.length,
     highlight_count: highlights.length,
     lowlight_count: lowlights.length,
     blocker_count: blockers.length,
