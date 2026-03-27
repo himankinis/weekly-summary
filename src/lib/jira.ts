@@ -105,7 +105,7 @@ export async function syncJiraToLog(): Promise<JiraSyncResult> {
       `(assignee = currentUser() OR reporter = currentUser()) AND updated >= "${dateStr}" ORDER BY updated DESC`
     );
     const data = await jiraFetch<JiraSearchResponse>(
-      `/search?jql=${jql}&maxResults=50&fields=${FIELDS}`
+      `/search/jql?jql=${jql}&maxResults=50&fields=${FIELDS}`
     );
     for (const issue of data.issues ?? []) issueMap.set(issue.key, issue);
   } catch (err) {
@@ -118,7 +118,7 @@ export async function syncJiraToLog(): Promise<JiraSyncResult> {
       `assignee = currentUser() AND status = "In Progress" ORDER BY updated DESC`
     );
     const data = await jiraFetch<JiraSearchResponse>(
-      `/search?jql=${jql}&maxResults=20&fields=${FIELDS}`
+      `/search/jql?jql=${jql}&maxResults=20&fields=${FIELDS}`
     );
     for (const issue of data.issues ?? []) {
       if (!issueMap.has(issue.key)) issueMap.set(issue.key, issue);
