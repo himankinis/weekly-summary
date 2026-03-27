@@ -1,10 +1,10 @@
-# Weekly Pulse
+# Weekly Summary
 
 A local-first weekly work summarizer for PMs. Captures daily highlights, lowlights, and blockers — plus auto-captures Claude Code activity via hooks — and generates a structured weekly summary.
 
 Built as part of the **AI Hacks for PMs** initiative.
 
-![Weekly Pulse dashboard](docs/screenshot.png)
+![Weekly Summary dashboard](docs/screenshot.png)
 
 ## What it does
 

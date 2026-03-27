@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Weekly Pulse Setup Script
+ * Weekly Summary Setup Script
  * Registers the on-prompt hook in Claude Code's settings.json
  *
  * Usage: npm run setup
@@ -59,7 +59,7 @@ const alreadyRegistered = settings.hooks.UserPromptSubmit.some(
 );
 
 if (alreadyRegistered) {
-  console.log("✅ Weekly Pulse hook is already registered.");
+  console.log("✅ Weekly Summary hook is already registered.");
   process.exit(0);
 }
 
@@ -78,7 +78,7 @@ settings.hooks.UserPromptSubmit.push({
 saveSettings(settingsPath, settings);
 
 console.log(`
-✅ Weekly Pulse hook registered!
+✅ Weekly Summary hook registered!
 
 Hook file:   ${HOOK_PATH}
 Settings:    ${settingsPath}

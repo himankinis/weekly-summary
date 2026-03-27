@@ -1,4 +1,4 @@
-# Weekly Pulse
+# Weekly Summary
 
 A local-first weekly work summarizer. Captures daily highlights, lowlights, and blockers — plus auto-captures Claude Code activity via hooks — and generates a structured weekly summary.
 

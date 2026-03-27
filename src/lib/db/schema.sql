@@ -1,4 +1,4 @@
--- Weekly Pulse Database Schema
+-- Weekly Summary Database Schema
 -- All timestamps stored as ISO 8601 strings in UTC
 -- week_start stored as YYYY-MM-DD (Monday of the week)
 

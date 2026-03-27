@@ -72,7 +72,7 @@ export default function Dashboard() {
         <div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <Activity className="h-5 w-5 text-primary" />
-            <span className="font-semibold tracking-tight">Weekly Pulse</span>
+            <span className="font-semibold tracking-tight">Weekly Summary</span>
           </div>
           <WeekNav weekStart={weekStart} onWeekChange={setWeekStart} />
         </div>
@@ -146,7 +146,7 @@ export default function Dashboard() {
       {/* Footer */}
       <footer className="mt-12 border-t border-border py-4">
         <div className="max-w-5xl mx-auto px-4 flex items-center justify-between text-xs text-muted-foreground">
-          <span>Weekly Pulse — local-first, data stays on your machine</span>
+          <span>Weekly Summary — local-first, data stays on your machine</span>
           <span>~/.weekly-pulse/weekly-pulse.db</span>
         </div>
       </footer>

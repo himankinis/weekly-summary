@@ -5,7 +5,7 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Weekly Pulse",
+  title: "Weekly Summary",
   description: "Local-first weekly work summarizer",
 };
 

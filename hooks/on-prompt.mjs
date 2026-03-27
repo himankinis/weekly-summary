@@ -1,11 +1,11 @@
 /**
- * Weekly Pulse — Claude Code "on-prompt" hook
+ * Weekly Summary — Claude Code "on-prompt" hook
  *
  * Fires on every Claude Code prompt submission. Sends the prompt text to the
- * local Weekly Pulse server which classifies it and stores it as a log entry.
+ * local Weekly Summary server which classifies it and stores it as a log entry.
  *
  * Registered by: npm run setup
- * Requires: Weekly Pulse dev server running (npm run dev)
+ * Requires: Weekly Summary dev server running (npm run dev)
  */
 
 import { execSync } from "child_process";

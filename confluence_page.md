@@ -1,4 +1,4 @@
-# Weekly Pulse — AI Productivity Tool for PMs
+# Weekly Summary — AI Productivity Tool for PMs
 
 **Status:** Live
 **Repo:** https://github.com/himankinis/weekly-pulse
@@ -8,7 +8,7 @@
 
 ## What is it?
 
-Weekly Pulse is a local-first weekly work summarizer built as part of the **AI Hacks for PMs** initiative. It replaces the manual "what did I do this week?" struggle by automatically collecting your work activity throughout the week and generating a structured summary on demand.
+Weekly Summary is a local-first weekly work summarizer built as part of the **AI Hacks for PMs** initiative. It replaces the manual "what did I do this week?" struggle by automatically collecting your work activity throughout the week and generating a structured summary on demand.
 
 All data stays on your machine (`~/.weekly-pulse/weekly-pulse.db`) — nothing is sent to any server.
 
@@ -16,7 +16,7 @@ All data stays on your machine (`~/.weekly-pulse/weekly-pulse.db`) — nothing i
 
 ## How it works
 
-Weekly Pulse collects entries from three sources:
+Weekly Summary collects entries from three sources:
 
 | Source | How it's captured |
 |---|---|
