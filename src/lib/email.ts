@@ -50,9 +50,13 @@ export const EMAIL_EXPORT_PATH = path.join(
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-/** Stable dedup key for an email — hash of date + subject */
+/** Stable dedup key for an email — hash of day-level date + subject + recipients.
+ *  Using day precision so repeated sends/edits of the same email on the same day
+ *  are treated as one entry. */
 function emailId(email: EmailRecord): string {
-  const raw = `${email.date}|${email.subject}`;
+  const day = email.date.slice(0, 10); // YYYY-MM-DD
+  const recipients = normalizeRecipients(email.recipients).sort().join(",");
+  const raw = `${day}|${email.subject}|${recipients}`;
   return "email:" + crypto.createHash("sha1").update(raw).digest("hex").slice(0, 16);
 }
 

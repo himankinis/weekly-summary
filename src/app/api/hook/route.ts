@@ -12,6 +12,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: "prompt is required" }, { status: 400 });
     }
 
+    const prompt = payload.prompt.trim();
+
+    // Filter noise: too short, system XML, or bare shell commands
+    if (prompt.length < 30) return NextResponse.json({ ok: true, data: { skipped: true } });
+    if (/<task-notification|<tool-use|<system-reminder/i.test(prompt))
+      return NextResponse.json({ ok: true, data: { skipped: true } });
+    if (/^(cd|git|npm|node|ls|cat|curl|open|python|bash|sh)\b/i.test(prompt))
+      return NextResponse.json({ ok: true, data: { skipped: true } });
+
     const db = getDb();
 
     // Check if hook capture is enabled

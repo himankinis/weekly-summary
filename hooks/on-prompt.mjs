@@ -21,7 +21,13 @@ process.stdin.on("end", async () => {
     const event = JSON.parse(raw || "{}");
     const prompt = event.prompt ?? event.userPrompt ?? event.message ?? "";
 
-    if (!prompt || prompt.length < 10) process.exit(0);
+    if (!prompt || prompt.length < 30) process.exit(0);
+
+    // Drop system/internal messages
+    if (/<task-notification|<tool-use|<system-reminder/i.test(prompt)) process.exit(0);
+
+    // Drop bare shell commands (not substantive work descriptions)
+    if (/^(cd|git|npm|node|ls|cat|curl|open|python|bash|sh)\b/i.test(prompt.trim())) process.exit(0);
 
     const payload = {
       prompt,
