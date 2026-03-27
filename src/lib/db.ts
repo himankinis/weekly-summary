@@ -39,13 +39,13 @@ export function getDb(): Database.Database {
 
 // ─── Migrations ───────────────────────────────────────────────────────────────
 
-/** Recreates log_entries with the updated source CHECK if it's missing jira/confluence */
+/** Recreates log_entries with the updated source CHECK if it's missing email */
 function migrateSourceConstraint(db: Database.Database): void {
   const row = db
     .prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='log_entries'")
     .get() as { sql: string } | undefined;
 
-  if (!row || row.sql.includes("'jira'")) return; // already up to date
+  if (!row || row.sql.includes("'email'")) return; // already up to date
 
   db.exec(`
     ALTER TABLE log_entries RENAME TO _log_entries_v1;
@@ -54,7 +54,7 @@ function migrateSourceConstraint(db: Database.Database): void {
       id            INTEGER PRIMARY KEY AUTOINCREMENT,
       content       TEXT    NOT NULL,
       type          TEXT    NOT NULL CHECK (type IN ('highlight', 'lowlight', 'blocker')),
-      source        TEXT    NOT NULL DEFAULT 'manual' CHECK (source IN ('manual', 'hook', 'calendar', 'jira', 'confluence')),
+      source        TEXT    NOT NULL DEFAULT 'manual' CHECK (source IN ('manual', 'hook', 'calendar', 'jira', 'confluence', 'email')),
       raw_prompt    TEXT,
       calendar_uid  TEXT,
       entry_date    TEXT    NOT NULL,
