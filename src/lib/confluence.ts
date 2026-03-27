@@ -3,14 +3,14 @@ import { getDb, getWeekStart, toDateStr } from "./db";
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 
 function getAuthHeader(): string {
-  const email = process.env.JIRA_EMAIL;
-  const token = process.env.JIRA_API_TOKEN;
+  const email = process.env.CONFLUENCE_EMAIL ?? process.env.JIRA_EMAIL;
+  const token = process.env.CONFLUENCE_API_TOKEN ?? process.env.JIRA_API_TOKEN;
   return `Basic ${Buffer.from(`${email}:${token}`).toString("base64")}`;
 }
 
 function getBase(): string {
-  const url = process.env.JIRA_URL;
-  if (!url) throw new Error("JIRA_URL not set in environment");
+  const url = process.env.CONFLUENCE_URL ?? process.env.JIRA_URL;
+  if (!url) throw new Error("CONFLUENCE_URL not set in environment");
   return url.replace(/\/$/, "");
 }
 
@@ -56,8 +56,10 @@ export interface ConfluenceSyncResult {
 // ─── Sync ─────────────────────────────────────────────────────────────────────
 
 export async function syncConfluenceToLog(): Promise<ConfluenceSyncResult> {
-  if (!process.env.JIRA_URL || !process.env.JIRA_EMAIL || !process.env.JIRA_API_TOKEN) {
-    throw new Error("Confluence credentials not configured. Set JIRA_URL, JIRA_EMAIL, JIRA_API_TOKEN in .env");
+  const email = process.env.CONFLUENCE_EMAIL ?? process.env.JIRA_EMAIL;
+  const token = process.env.CONFLUENCE_API_TOKEN ?? process.env.JIRA_API_TOKEN;
+  if (!process.env.CONFLUENCE_URL || !email || !token) {
+    throw new Error("Confluence credentials not configured. Set CONFLUENCE_URL, CONFLUENCE_EMAIL, CONFLUENCE_API_TOKEN in .env");
   }
 
   const db = getDb();
