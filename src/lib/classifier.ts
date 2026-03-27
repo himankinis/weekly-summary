@@ -12,6 +12,15 @@ interface PatternRule {
 
 const RULES: PatternRule[] = [
   {
+    // File-sharing notifications — always a highlight; outweighs incidental "access" hits
+    type: "highlight",
+    weight: 4,
+    patterns: [
+      /\bshared\b.+\bwith\s+(you|me)\b/i,
+      /\bhas\s+shared\b/i,
+    ],
+  },
+  {
     type: "highlight",
     weight: 2,
     patterns: [
