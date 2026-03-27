@@ -234,102 +234,285 @@ function PPMView({ summary }: { summary: WeeklySummaryData }) {
   );
 }
 
+// ─── Initiative Grouping ──────────────────────────────────────────────────────
+
+/** Words that don't help identify a specific initiative topic */
+const INITIATIVE_STOP = new Set([
+  "with", "from", "your", "their", "about", "have", "been", "will", "next",
+  "last", "some", "several", "multiple", "cross", "functional",
+  // action verbs
+  "completed", "aligned", "drove", "discussed", "delivered", "shipped", "built",
+  "initiated", "created", "updated", "published", "gathered", "getting",
+  "following", "working", "sharing", "began", "starting",
+  // generic PM nouns
+  "leadership", "stakeholders", "approach", "progress", "session", "analysis",
+  "approval", "draft", "summary", "status", "commitment", "initiative",
+  "forward", "context", "details", "touchpoints", "adoption", "review",
+  "weekly", "monthly", "update", "planning", "strategy",
+]);
+
+/** Extract words meaningful enough to identify an initiative */
+function initWords(text: string): string[] {
+  return text.split(/\W+/).filter((w) => {
+    if (!w) return false;
+    if (/^[A-Z]{2,5}$/.test(w)) return true; // keep acronyms
+    return w.length >= 5 && !INITIATIVE_STOP.has(w.toLowerCase());
+  });
+}
+
+interface InitGroup {
+  name: string;
+  items: SummaryItem[];
+}
+
+/** Cluster highlights that share ≥1 significant word */
+function groupByInitiative(items: SummaryItem[]): InitGroup[] {
+  if (items.length === 0) return [];
+
+  const wordSets = items.map(
+    (item) => new Set(initWords(item.content).map((w) => w.toLowerCase()))
+  );
+
+  const parent = items.map((_, i) => i);
+  function find(x: number): number {
+    if (parent[x] !== x) parent[x] = find(parent[x]);
+    return parent[x];
+  }
+  function union(a: number, b: number) {
+    const pa = find(a), pb = find(b);
+    if (pa !== pb) parent[pa] = pb;
+  }
+
+  for (let i = 0; i < items.length; i++) {
+    for (let j = i + 1; j < items.length; j++) {
+      if ([...wordSets[j]].some((w) => wordSets[i].has(w))) union(i, j);
+    }
+  }
+
+  const map = new Map<number, number[]>();
+  for (let i = 0; i < items.length; i++) {
+    const r = find(i);
+    if (!map.has(r)) map.set(r, []);
+    map.get(r)!.push(i);
+  }
+
+  return [...map.values()]
+    .map((indices) => {
+      const groupItems = indices.map((i) => items[i]);
+      return { name: initiativeName(groupItems), items: groupItems };
+    })
+    .sort((a, b) => b.items.length - a.items.length);
+}
+
+function initiativeName(items: SummaryItem[]): string {
+  const acronyms: string[] = [];
+  const freq: Record<string, number> = {};
+  const firstItem = items[0].content;
+
+  for (const item of items) {
+    for (const w of initWords(item.content)) {
+      if (/^[A-Z]{2,5}$/.test(w)) {
+        if (!acronyms.includes(w)) acronyms.push(w);
+      } else {
+        const lower = w.toLowerCase();
+        freq[lower] = (freq[lower] ?? 0) + 1;
+      }
+    }
+  }
+
+  // Sort: frequency desc, then position in first item (earlier = more prominent)
+  const topWords = Object.entries(freq)
+    .sort((a, b) => {
+      if (b[1] !== a[1]) return b[1] - a[1];
+      const posA = firstItem.toLowerCase().indexOf(a[0]);
+      const posB = firstItem.toLowerCase().indexOf(b[0]);
+      return posA - posB;
+    })
+    .map(([w]) => w.charAt(0).toUpperCase() + w.slice(1));
+
+  // e.g. "DMP Metering", "PRD Agents", or solo "Decommissioning"
+  if (acronyms.length > 0) {
+    return topWords[0] ? `${acronyms[0]} ${topWords[0]}` : acronyms[0];
+  }
+  // Long distinctive single word is enough on its own
+  if (topWords[0] && topWords[0].length >= 11) return topWords[0];
+  return topWords.length >= 2 ? `${topWords[0]} ${topWords[1]}` : (topWords[0] ?? "Other");
+}
+
+/** Short theme name for the opening sentence (no bigrams for long words) */
+function shortThemeName(g: InitGroup): string {
+  const words = g.name.split(" ");
+  // "DMP Metering" → keep; "Migration Strawman" → "Migration"
+  if (/^[A-Z]{2,5}$/.test(words[0])) return g.name;
+  return words[0];
+}
+
+/** "This week I focused on X and Y." opening for 1:1 */
+function themeSentence(highlights: SummaryItem[]): string {
+  const source = highlights.filter((h) => h.source === "manual");
+  const groups = groupByInitiative(source.length > 0 ? source : highlights);
+  if (groups.length === 0) return "";
+  const names = groups.slice(0, 2).map(shortThemeName);
+  const theme = names.length === 1 ? names[0] : `${names[0]} and ${names[1]}`;
+  return `This week I focused on ${theme}.`;
+}
+
+/** Reframe a blocker as an actionable ask for the manager */
+function frameBlocker(b: SummaryItem): string {
+  const c = b.content;
+  if (/^(I need|Decision needed|Need your)/i.test(c)) return c;
+  const blockedMatch = c.match(/^(.+?)\s+is\s+blocked/i);
+  if (blockedMatch) return `Decision needed on ${blockedMatch[1].trim()}`;
+  return `I need your help with: ${c}`;
+}
+
 // ─── Stakeholders View ────────────────────────────────────────────────────────
 
 function buildStakeholdersText(s: WeeklySummaryData): string {
   const ws = format(parseISO(s.weekStart), "MMM d");
-  const we = format(parseISO(s.weekEnd),   "MMM d");
-  const lines: string[] = [];
+  const we = format(parseISO(s.weekEnd), "MMM d");
+  const lines: string[] = [`Weekly update for ${ws}–${we}:`, ""];
 
-  lines.push(`Based on your recent activities and project updates for the week of ${ws} to ${we}, here is your weekly work summary.`);
-  lines.push("");
-  lines.push(quantLine(s));
-  lines.push("");
-
-  if (s.highlights.length > 0) {
-    lines.push("### Highlights: Key Accomplishments");
-    const manualH = s.highlights.filter((h) => h.source === "manual");
-    manualH.forEach((h) => lines.push(`- **${firstPhrase(h.content)}** — ${h.content}`));
-    if (s.stats.jira_count > 0)  lines.push(`- **Jira activity** — ${s.stats.jira_count} ticket${s.stats.jira_count > 1 ? "s" : ""} resolved or updated`);
-    if (s.stats.email_count > 0) lines.push(`- **Email** — ${s.stats.email_count} emails sent across active workstreams`);
-    lines.push("");
+  const groups = groupByInitiative(s.highlights);
+  for (const g of groups.slice(0, 6)) {
+    const content = g.items[0].content;
+    const more = g.items.length > 1 ? ` — and ${g.items.length - 1} more` : "";
+    lines.push(`· ${g.name}: ${content}${more}.`);
   }
 
-  if (s.lowlights.length > 0) {
-    lines.push("### Lowlights: Challenges & Risks");
-    s.lowlights.forEach((l) => lines.push(`- **${firstPhrase(l.content)}** — ${l.content}`));
-    lines.push("");
+  for (const b of s.blockers.slice(0, 2)) {
+    const jira = extractJiraKey(b.content);
+    const topic = b.content
+      .replace(/\s*\(Jira:.*?\)\s*$/i, "")
+      .replace(/\s+is\s+blocked.*$/i, "")
+      .trim();
+    lines.push(`· ${topic}: Pending resolution${jira ? ` (${jira})` : ""}. At risk.`);
   }
 
-  if (s.blockers.length > 0) {
-    lines.push("### Blockers");
-    s.blockers.forEach((b) => {
-      const jiraRef = extractJiraKey(b.content);
-      lines.push(`- **${firstPhrase(b.content)}** — ${b.content}${jiraRef ? ` (Jira: ${jiraRef})` : ""}`);
-    });
-    lines.push("");
+  if (groups.length === 0 && s.blockers.length === 0) {
+    lines.push("No activity logged this week.");
   }
-
-  lines.push("### Relevant Sources");
-  const sources: string[] = [];
-  if (s.stats.jira_count > 0)    sources.push(`Jira: ${s.stats.jira_count} ticket${s.stats.jira_count > 1 ? "s" : ""} updated`);
-  if (s.stats.meeting_count > 0) sources.push(`Calendar: ${s.stats.meeting_count} meetings`);
-  if (s.stats.email_count > 0)   sources.push(`Outlook: ${s.stats.email_count} emails`);
-  const manualCount = s.highlights.filter((h) => h.source === "manual").length +
-                      s.lowlights.filter((l) => l.source === "manual").length +
-                      s.blockers.filter((b) => b.source === "manual").length;
-  if (manualCount > 0) sources.push(`Manual: ${manualCount} entries`);
-  sources.forEach((src) => lines.push(`- ${src}`));
 
   return lines.join("\n");
 }
 
 function StakeholdersView({ summary: s }: { summary: WeeklySummaryData }) {
   const ws = format(parseISO(s.weekStart), "MMM d");
-  const we = format(parseISO(s.weekEnd),   "MMM d");
-  const manualH = s.highlights.filter((h) => h.source === "manual");
+  const we = format(parseISO(s.weekEnd), "MMM d");
+  const groups = groupByInitiative(s.highlights);
+
+  return (
+    <div className="space-y-3 text-sm">
+      <p className="text-xs text-muted-foreground italic">Weekly update for {ws}–{we}</p>
+      {groups.length === 0 && s.blockers.length === 0 ? (
+        <p className="text-muted-foreground italic text-sm">No activity logged this week.</p>
+      ) : (
+        <ul className="space-y-2">
+          {groups.slice(0, 6).map((g, i) => {
+            const content = g.items[0].content;
+            const more = g.items.length > 1
+              ? <span className="text-muted-foreground"> — and {g.items.length - 1} more</span>
+              : null;
+            return (
+              <li key={i} className="flex items-start gap-2">
+                <span className="text-muted-foreground mt-0.5 shrink-0">·</span>
+                <span>
+                  <strong className="text-foreground">{g.name}:</strong>{" "}
+                  {content}{more}.
+                </span>
+              </li>
+            );
+          })}
+          {s.blockers.slice(0, 2).map((b, i) => {
+            const jira = extractJiraKey(b.content);
+            const topic = b.content
+              .replace(/\s*\(Jira:.*?\)\s*$/i, "")
+              .replace(/\s+is\s+blocked.*$/i, "")
+              .trim();
+            return (
+              <li key={`b-${i}`} className="flex items-start gap-2">
+                <span className="text-amber-500 mt-0.5 shrink-0">·</span>
+                <span>
+                  <strong className="text-foreground">{topic}:</strong>{" "}
+                  Pending resolution{jira ? ` (${jira})` : ""}.{" "}
+                  <span className="text-amber-600 dark:text-amber-400 font-medium">At risk.</span>
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+// ─── Manager (1:1) View ───────────────────────────────────────────────────────
+
+function buildManagerText(s: WeeklySummaryData): string {
+  const lines: string[] = [];
+
+  const theme = themeSentence(s.highlights);
+  if (theme) { lines.push(theme); lines.push(""); }
+
+  if (s.highlights.length > 0) {
+    lines.push("### Highlights");
+    // Order by initiative group for cohesion
+    groupByInitiative(s.highlights)
+      .flatMap((g) => g.items)
+      .slice(0, 5)
+      .forEach((h) => lines.push(`· ${h.content}`));
+    lines.push("");
+  }
+
+  if (s.blockers.length > 0) {
+    lines.push("### Blockers");
+    s.blockers.slice(0, 3).forEach((b) => lines.push(`· ${frameBlocker(b)}`));
+    lines.push("");
+  }
+
+  if (s.decisions.length > 0) {
+    lines.push("### Key Decisions");
+    s.decisions.slice(0, 3).forEach((d) => lines.push(`· ${d.content}`));
+    lines.push("");
+  }
+
+  const nextMeetings = s.nextWeekPreview
+    .filter((p) => p.startsWith("  ·"))
+    .map((p) => p.replace(/^\s+·\s*/, ""))
+    .slice(0, 3);
+  const carryOver = s.nextWeekPreview.find((p) => p.startsWith("🔄"));
+  if (nextMeetings.length > 0 || carryOver) {
+    lines.push("### Next Week");
+    nextMeetings.forEach((m) => lines.push(`· ${m}`));
+    if (carryOver) lines.push(`· ${carryOver}`);
+  }
+
+  return lines.join("\n");
+}
+
+function ManagerView({ summary: s }: { summary: WeeklySummaryData }) {
+  const theme = themeSentence(s.highlights);
+  const sortedHighlights = groupByInitiative(s.highlights).flatMap((g) => g.items).slice(0, 5);
+  const nextMeetings = s.nextWeekPreview
+    .filter((p) => p.startsWith("  ·"))
+    .map((p) => p.replace(/^\s+·\s*/, ""))
+    .slice(0, 3);
+  const carryOver = s.nextWeekPreview.find((p) => p.startsWith("🔄"));
 
   return (
     <div className="space-y-4 text-sm">
-      <p className="text-xs text-muted-foreground leading-relaxed">{quantLine(s)}</p>
-      <p className="text-muted-foreground italic text-xs">
-        Based on activities for the week of {ws} to {we}.
-      </p>
-
-      {s.highlights.length > 0 && (
-        <div>
-          <h4 className="font-semibold mb-1.5">Highlights: Key Accomplishments</h4>
-          <ul className="space-y-1">
-            {manualH.map((h, i) => (
-              <li key={i} className="flex items-start gap-2">
-                <span className="text-muted-foreground mt-1 text-xs shrink-0">•</span>
-                <span><strong>{firstPhrase(h.content)}</strong> — {h.content}</span>
-              </li>
-            ))}
-            {s.stats.jira_count > 0 && (
-              <li className="flex items-start gap-2">
-                <span className="text-muted-foreground mt-1 text-xs shrink-0">•</span>
-                <span><strong>Jira activity</strong> — {s.stats.jira_count} ticket{s.stats.jira_count > 1 ? "s" : ""} resolved or updated</span>
-              </li>
-            )}
-            {s.stats.email_count > 0 && (
-              <li className="flex items-start gap-2">
-                <span className="text-muted-foreground mt-1 text-xs shrink-0">•</span>
-                <span><strong>Email</strong> — {s.stats.email_count} emails sent across active workstreams</span>
-              </li>
-            )}
-          </ul>
-        </div>
+      {theme && (
+        <p className="font-medium">{theme}</p>
       )}
 
-      {s.lowlights.length > 0 && (
+      {sortedHighlights.length > 0 && (
         <div>
-          <h4 className="font-semibold mb-1.5">Lowlights: Challenges &amp; Risks</h4>
-          <ul className="space-y-1">
-            {s.lowlights.map((l, i) => (
+          <h4 className="font-semibold mb-1.5">Highlights</h4>
+          <ul className="space-y-1.5">
+            {sortedHighlights.map((h, i) => (
               <li key={i} className="flex items-start gap-2">
-                <span className="text-muted-foreground mt-1 text-xs shrink-0">•</span>
-                <span><strong>{firstPhrase(l.content)}</strong> — {l.content}</span>
+                <span className="text-green-500 mt-0.5 shrink-0">·</span>
+                <span>{h.content}</span>
               </li>
             ))}
           </ul>
@@ -339,63 +522,24 @@ function StakeholdersView({ summary: s }: { summary: WeeklySummaryData }) {
       {s.blockers.length > 0 && (
         <div>
           <h4 className="font-semibold mb-1.5">Blockers</h4>
-          <ul className="space-y-1">
-            {s.blockers.map((b, i) => {
-              const jiraRef = extractJiraKey(b.content);
-              return (
-                <li key={i} className="flex items-start gap-2">
-                  <span className="text-red-500 mt-1 text-xs shrink-0">•</span>
-                  <span>
-                    <strong>{firstPhrase(b.content)}</strong> — {b.content}
-                    {jiraRef && <span className="ml-1 text-xs text-muted-foreground">(Jira: {jiraRef})</span>}
-                  </span>
-                </li>
-              );
-            })}
+          <ul className="space-y-1.5">
+            {s.blockers.slice(0, 3).map((b, i) => (
+              <li key={i} className="flex items-start gap-2">
+                <span className="text-red-500 mt-0.5 shrink-0">·</span>
+                <span>{frameBlocker(b)}</span>
+              </li>
+            ))}
           </ul>
         </div>
       )}
 
-      <div>
-        <h4 className="font-semibold mb-1.5">Relevant Sources</h4>
-        <SourcesLine stats={s.stats} highlights={s.highlights} lowlights={s.lowlights} blockers={s.blockers} />
-      </div>
-    </div>
-  );
-}
-
-// ─── Manager (1:1) View ───────────────────────────────────────────────────────
-
-function buildManagerText(s: WeeklySummaryData): string {
-  const base = buildStakeholdersText(s);
-  const lines: string[] = [base, ""];
-
-  if (s.decisions.length > 0) {
-    lines.push("### Key Decisions Made");
-    s.decisions.forEach((d) => lines.push(`- ${d.content}`));
-    lines.push("");
-  }
-
-  if (s.nextWeekPreview.length > 0) {
-    lines.push("### Next Week Preview");
-    s.nextWeekPreview.forEach((p) => lines.push(`- ${p}`));
-  }
-
-  return lines.join("\n");
-}
-
-function ManagerView({ summary: s }: { summary: WeeklySummaryData }) {
-  return (
-    <div className="space-y-4">
-      <StakeholdersView summary={s} />
-
       {s.decisions.length > 0 && (
-        <div className="text-sm">
-          <h4 className="font-semibold mb-1.5">🎯 Key Decisions Made</h4>
-          <ul className="space-y-1">
-            {s.decisions.map((d, i) => (
+        <div>
+          <h4 className="font-semibold mb-1.5">Key Decisions</h4>
+          <ul className="space-y-1.5">
+            {s.decisions.slice(0, 3).map((d, i) => (
               <li key={i} className="flex items-start gap-2">
-                <span className="text-muted-foreground mt-1 text-xs shrink-0">•</span>
+                <span className="text-muted-foreground mt-0.5 shrink-0">·</span>
                 <span>{d.content}</span>
               </li>
             ))}
@@ -403,18 +547,28 @@ function ManagerView({ summary: s }: { summary: WeeklySummaryData }) {
         </div>
       )}
 
-      {s.nextWeekPreview.length > 0 && (
-        <div className="text-sm">
-          <h4 className="font-semibold mb-1.5">🔭 Next Week Preview</h4>
-          <ul className="space-y-1">
-            {s.nextWeekPreview.map((p, i) => (
+      {(nextMeetings.length > 0 || carryOver) && (
+        <div>
+          <h4 className="font-semibold mb-1.5">Next Week</h4>
+          <ul className="space-y-1.5">
+            {nextMeetings.map((m, i) => (
               <li key={i} className="flex items-start gap-2">
-                <span className="text-muted-foreground mt-1 text-xs shrink-0">•</span>
-                <span>{p}</span>
+                <span className="text-muted-foreground mt-0.5 shrink-0">·</span>
+                <span>{m}</span>
               </li>
             ))}
+            {carryOver && (
+              <li className="flex items-start gap-2">
+                <span className="text-amber-500 mt-0.5 shrink-0">·</span>
+                <span className="text-muted-foreground">{carryOver}</span>
+              </li>
+            )}
           </ul>
         </div>
+      )}
+
+      {sortedHighlights.length === 0 && (
+        <p className="text-muted-foreground italic">No highlights logged — add entries from the dashboard.</p>
       )}
     </div>
   );
