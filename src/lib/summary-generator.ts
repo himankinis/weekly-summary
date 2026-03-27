@@ -234,28 +234,33 @@ function buildNarrative(
 }
 
 function extractTopTheme(highlights: SummaryItem[]): string {
-  if (highlights.length === 0) return "";
+  // Only use manual entries — email/hook subjects contain names and noise
+  const source = highlights.filter((h) => h.source === "manual");
+  if (source.length === 0) return "";
 
   const stopWords = new Set([
     "the", "and", "for", "with", "this", "that", "from", "have", "been",
     "were", "they", "their", "into", "also", "sent", "email", "about",
+    "shared", "completed", "update", "updates", "review", "meeting",
   ]);
 
   const freq: Record<string, number> = {};
-  for (const h of highlights) {
+  for (const h of source) {
     const words = h.content.split(/\W+/);
-    for (const w of words) {
-      if (w.length >= 6 && !stopWords.has(w.toLowerCase())) {
-        const key = w.toLowerCase();
-        freq[key] = (freq[key] ?? 0) + 1;
-      }
+    for (let i = 0; i < words.length; i++) {
+      const w = words[i];
+      if (w.length < 6) continue;
+      const lower = w.toLowerCase();
+      if (stopWords.has(lower)) continue;
+      // Skip proper nouns: capitalized mid-sentence (not the first word)
+      if (i > 0 && w[0] === w[0].toUpperCase() && w[0] !== w[0].toLowerCase()) continue;
+      freq[lower] = (freq[lower] ?? 0) + 1;
     }
   }
 
   const top = Object.entries(freq).sort((a, b) => b[1] - a[1])[0];
   if (!top || top[1] < 2) return "";
 
-  // Capitalize first letter
   return top[0].charAt(0).toUpperCase() + top[0].slice(1);
 }
 
