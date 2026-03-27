@@ -31,7 +31,46 @@ export function getDb(): Database.Database {
   const schema = fs.readFileSync(SCHEMA_PATH, "utf-8");
   _db.exec(schema);
 
+  // Migrate existing DBs to support jira/confluence sources
+  migrateSourceConstraint(_db);
+
   return _db;
+}
+
+// ─── Migrations ───────────────────────────────────────────────────────────────
+
+/** Recreates log_entries with the updated source CHECK if it's missing jira/confluence */
+function migrateSourceConstraint(db: Database.Database): void {
+  const row = db
+    .prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='log_entries'")
+    .get() as { sql: string } | undefined;
+
+  if (!row || row.sql.includes("'jira'")) return; // already up to date
+
+  db.exec(`
+    ALTER TABLE log_entries RENAME TO _log_entries_v1;
+
+    CREATE TABLE log_entries (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      content       TEXT    NOT NULL,
+      type          TEXT    NOT NULL CHECK (type IN ('highlight', 'lowlight', 'blocker')),
+      source        TEXT    NOT NULL DEFAULT 'manual' CHECK (source IN ('manual', 'hook', 'calendar', 'jira', 'confluence')),
+      raw_prompt    TEXT,
+      calendar_uid  TEXT,
+      entry_date    TEXT    NOT NULL,
+      week_start    TEXT    NOT NULL,
+      created_at    TEXT    NOT NULL DEFAULT (datetime('now')),
+      updated_at    TEXT    NOT NULL DEFAULT (datetime('now'))
+    );
+
+    INSERT INTO log_entries SELECT * FROM _log_entries_v1;
+    DROP TABLE _log_entries_v1;
+
+    CREATE INDEX IF NOT EXISTS idx_log_entries_week_start  ON log_entries (week_start);
+    CREATE INDEX IF NOT EXISTS idx_log_entries_entry_date  ON log_entries (entry_date);
+    CREATE INDEX IF NOT EXISTS idx_log_entries_type        ON log_entries (type);
+    CREATE INDEX IF NOT EXISTS idx_log_entries_source      ON log_entries (source);
+  `);
 }
 
 // ─── Settings ─────────────────────────────────────────────────────────────────

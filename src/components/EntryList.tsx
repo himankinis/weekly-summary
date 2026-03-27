@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Trash2, Zap, User, Calendar, ChevronDown, ChevronRight } from "lucide-react";
+import { Trash2, Zap, User, Calendar, ChevronDown, ChevronRight, SquareKanban, FileText } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import type { EntryType, EntrySource, LogEntry } from "@/lib/types";
 
@@ -25,6 +25,8 @@ const SOURCE_ICON: Record<EntrySource, React.ReactNode> = {
   manual: <User className="h-3 w-3" />,
   hook: <Zap className="h-3 w-3" />,
   calendar: <Calendar className="h-3 w-3" />,
+  jira: <SquareKanban className="h-3 w-3" />,
+  confluence: <FileText className="h-3 w-3" />,
 };
 
 function EntryRow({ entry, onDelete }: { entry: LogEntry; onDelete: (id: number) => void }) {

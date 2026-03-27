@@ -6,6 +6,7 @@ import DailyLogInput from "@/components/DailyLogInput";
 import EntryList from "@/components/EntryList";
 import SummaryPanel from "@/components/SummaryPanel";
 import CalendarPanel from "@/components/CalendarPanel";
+import AtlassianPanel from "@/components/AtlassianPanel";
 import WeekNav from "@/components/WeekNav";
 import { format } from "date-fns";
 import { Activity, Zap } from "lucide-react";
@@ -131,9 +132,10 @@ export default function Dashboard() {
             </Card>
           </div>
 
-          {/* Right column: summary + calendar */}
+          {/* Right column: summary + atlassian + calendar */}
           <div className="lg:col-span-2 space-y-5">
             <SummaryPanel key={`${weekStart}-${summaryKey}`} weekStart={weekStart} />
+            <AtlassianPanel onSynced={() => fetchEntries(weekStart)} />
             <CalendarPanel weekStart={weekStart} />
           </div>
         </div>

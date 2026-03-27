@@ -1,7 +1,7 @@
 // ─── Entry Types ──────────────────────────────────────────────────────────────
 
 export type EntryType = "highlight" | "lowlight" | "blocker";
-export type EntrySource = "manual" | "hook" | "calendar";
+export type EntrySource = "manual" | "hook" | "calendar" | "jira" | "confluence";
 
 export interface LogEntry {
   id: number;
