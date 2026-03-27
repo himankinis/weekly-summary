@@ -35,11 +35,11 @@ Click **Generate Summary** and choose your audience from the dropdown:
 | Format | Contents | Best for |
 |---|---|---|
 | **PPM Weekly Highlights** (default) | Paste-ready markdown table — max 5 highlights, 3 blockers | PPM Weekly Highlights doc |
-| **For Stakeholders** | Narrative opening · highlights with bold topics · Jira/email rollups · Relevant Sources | Leadership updates, status emails |
-| **For 1:1 with Manager** | Everything in stakeholders + Key Decisions + Next Week Preview | Weekly 1:1 prep |
+| **For Stakeholders** | Executive bullets grouped by initiative: "**Initiative:** lead item — and N more." No sections, scannable in 30 seconds | Leadership updates, status emails |
+| **For 1:1 with Manager** | Theme sentence ("This week I focused on X and Y.") + Highlights (initiative-sorted) + Blockers (framed as asks) + Key Decisions + Next Week | Weekly 1:1 prep |
 | **For Myself** | Full detail — all sections including meetings with Jira enrichment | Personal record |
 
-All formats synthesize raw data into PM-quality language. The summary generator groups related email threads, translates Jira statuses into accomplishments, and filters calendar noise — so every line starts with an action verb and reflects real work, not activity metadata.
+All formats synthesize raw data into PM-quality language. Highlights are automatically clustered by initiative using shared keywords. Blockers are reframed as actionable manager asks ("Decision needed on X" or "I need your help with: X"). The summary generator groups related email threads, translates Jira statuses into accomplishments, and filters calendar noise — so every line starts with an action verb and reflects real work, not activity metadata.
 
 ![Generated PPM summary](docs/screenshots/summary-output.png)
 
