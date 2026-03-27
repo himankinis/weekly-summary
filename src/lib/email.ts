@@ -25,7 +25,7 @@ export interface EmailSyncResult {
 
 export const EMAIL_EXPORT_PATH = path.join(
   os.homedir(),
-  "Downloads",
+  "OneDrive - FICO",
   "WeeklyPulse",
   "email_export.json"
 );
