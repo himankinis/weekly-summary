@@ -103,7 +103,7 @@ function section(title, items, color, emoji) {
 const weekStartFmt = formatDate(weekStart);
 const weekEndFmt = formatDate(weekEnd);
 
-console.log(`\n${BOLD}${CYAN}WEEKLY PULSE — ${weekStartFmt} → ${weekEndFmt}${RESET}`);
+console.log(`\n${BOLD}${CYAN}WEEKLY SUMMARY — ${weekStartFmt} → ${weekEndFmt}${RESET}`);
 console.log(`${"═".repeat(50)}`);
 
 if (entries.length === 0 && calEvents.length === 0) {
