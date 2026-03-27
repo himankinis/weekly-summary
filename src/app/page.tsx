@@ -9,6 +9,7 @@ import CalendarPanel from "@/components/CalendarPanel";
 import AtlassianPanel from "@/components/AtlassianPanel";
 import EmailPanel from "@/components/EmailPanel";
 import WeekNav from "@/components/WeekNav";
+import PastSummariesPanel from "@/components/PastSummariesPanel";
 import { format, subDays, parseISO } from "date-fns";
 import { Activity, Zap } from "lucide-react";
 import type { LogEntry } from "@/lib/types";
@@ -158,6 +159,7 @@ export default function Dashboard() {
             <AtlassianPanel onSynced={() => fetchEntries(weekStart)} />
             <EmailPanel onSynced={() => fetchEntries(weekStart)} />
             <CalendarPanel weekStart={weekStart} />
+            <PastSummariesPanel />
           </div>
         </div>
       </main>
