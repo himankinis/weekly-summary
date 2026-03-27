@@ -1,159 +1,110 @@
-# Weekly Summary — AI Productivity Tool for PMs
+# Weekly Summary Agent — Setup & Usage Guide
 
 **Status:** Live
-**Repo:** https://github.com/himankinis/weekly-summary
+**Repo:** https://github.com/himankinis/weekly-pulse
 **Owner:** Himankini Shah
 
 ---
 
-## What is it?
+## Overview
 
-Weekly Summary is a local-first weekly work summarizer built as part of the **AI Hacks for PMs** initiative. It replaces the manual "what did I do this week?" struggle by automatically collecting your work activity throughout the week — from Jira, Outlook email, calendar, and Claude Code — and generating a structured summary on demand.
+Weekly Summary is a local-first weekly work summarizer that auto-pulls from Jira, Outlook, calendar, and Claude Code to generate structured weekly summaries. It produces concise highlights, lowlights, and blockers in multiple formats — a PPM Weekly Highlights table for the team doc, a stakeholder narrative, 1:1 prep, and a personal reference view. Saves 30–60 min/week on status reporting and improves 1:1 quality [1].
 
-All data stays on your machine (`~/.weekly-pulse/weekly-pulse.db`) — nothing is sent to any external server.
-
----
-
-## How it works
-
-Weekly Summary collects entries from five sources:
-
-| Source | How it's captured |
-|---|---|
-| **Manual** | Type highlights, lowlights, or blockers directly in the dashboard |
-| **Jira** | Synced via Jira REST API — resolved/updated tickets appear as highlights |
-| **Confluence** | Synced via Confluence REST API — pages you created or edited |
-| **Outlook email** | Imported from an Outlook JSON export — sent emails appear as highlights |
-| **Calendar** | Pulled from your calendar ICS feed and classified as meetings |
-| **Claude Code activity** | Auto-captured via a hook that fires on every prompt you submit to Claude Code |
-
-At week's end, one click generates a formatted summary with the right level of detail for any audience.
+All data stays on your machine in a local SQLite database — nothing is sent to any external server.
 
 ---
 
-## Entry types
+## What It Does
 
-| Type | Meaning |
-|---|---|
-| ✅ Highlight | Accomplishment, shipped work, good decision |
-| ⚠️ Lowlight | Delay, missed target, thing that took longer than expected |
-| 🚫 Blocker | Dependency, access issue, waiting on others |
+- Pulls Jira tickets (resolved, in progress, blocked) from fico-prod.atlassian.net
+- Pulls Outlook sent emails via Power Automate export
+- Syncs calendar meetings via ICS feed
+- Auto-captures Claude Code activity via hooks
+- Supports manual entry of highlights, lowlights, and blockers
+- Generates summaries in four formats:
+  - **PPM Weekly Highlights** (default) — paste-ready markdown table for the team doc
+  - **For Stakeholders** — structured narrative with bold topics and source rollups
+  - **For 1:1 with Manager** — stakeholder view + key decisions + next week preview
+  - **For Myself** — full detail with all sections including meetings
+- Copy to clipboard for easy pasting into docs, emails, or Teams
 
 ---
 
-## Setup
+## Setup Instructions
 
-**Prerequisites:** Node.js 20+, npm
+**Prerequisites:** Node.js 20+, Claude Code installed
+
+### Step 1: Clone the repo
 
 ```bash
-# 1. Clone the repo
-git clone https://github.com/himankinis/weekly-summary
-cd weekly-summary
-
-# 2. Install dependencies
+git clone https://github.com/himankinis/weekly-pulse
+cd weekly-pulse
 npm install
+```
 
-# 3. Configure integrations (copy and fill in your credentials)
-cp .env.example .env
+### Step 2: Create your .env file
 
-# 4. Register the Claude Code hook (auto-captures your prompts)
+Create a `.env` file in the project root with your own credentials:
+
+```
+JIRA_URL=https://fico-prod.atlassian.net
+JIRA_EMAIL=your_email@fico.com
+JIRA_API_TOKEN=your_token
+```
+
+Generate your Jira API token at: https://id.atlassian.com/manage-profile/security/api-tokens
+
+### Step 3: Register Claude Code hooks
+
+```bash
 npm run setup
+```
 
-# 5. Start the dashboard
+This registers a hook that auto-captures your Claude Code prompts as activity entries. Start a new Claude Code session after running setup for the hook to take effect.
+
+### Step 4: Start the dashboard
+
+```bash
 npm run dev
 ```
 
-Open **http://localhost:3000** — the dashboard is ready.
+Open **http://localhost:3000**
 
-> The server must be running for Claude Code activity to be auto-captured. Start a new Claude Code session after running `npm run setup` for the hook to take effect.
+### Step 5: Connect your calendar
 
-### Environment variables
+Click **"Add ICS Feed"** on the dashboard and paste your Outlook calendar ICS URL.
 
-| Variable | Description |
-|---|---|
-| `JIRA_BASE_URL` | Your Jira instance URL (e.g. `https://yourorg.atlassian.net`) |
-| `CONFLUENCE_URL` | Your Confluence instance URL |
-| `ATLASSIAN_EMAIL` | Your Atlassian account email |
-| `JIRA_API_TOKEN` | API token from [id.atlassian.com](https://id.atlassian.com/manage-profile/security/api-tokens) |
+> To get your ICS URL: Outlook Web → Settings → Calendar → Shared calendars → Publish a calendar → copy the ICS link.
 
----
+### Step 6 (Optional): Set up Outlook email export
 
-## Using the dashboard
-
-### Logging entries
-- **Log an entry** — type a note and tag it as highlight / lowlight / blocker
-- **Claude Activity** — auto-captured Claude Code prompts appear in a dedicated section (expandable to see the raw prompt); excluded from the generated summary
-
-### Syncing data
-- **Jira & Confluence** — click "Sync Jira & Confluence" to pull this week's tickets and pages
-- **Email** — click "Sync Email" to import from your Outlook JSON export
-- **Calendar** — paste your ICS URL in settings to sync meetings
-
-### Viewing entries
-Entries can be grouped two ways using the toggle in the log card:
-- **By type** — Highlights / Lowlights / Blockers / Claude Activity
-- **By source** — Manual / Jira / Confluence / Email / Claude
-
-Each source has a color-coded pill badge: green (Jira), blue (Calendar), purple (Email), orange (Claude), gray (Manual/Confluence).
-
-### Stats and trends
-The dashboard header strip shows counts for highlights, lowlights, blockers, meetings, and auto-captured entries. A stacked progress bar below shows the highlight/lowlight/blocker ratio for the week, with a trend comparison against the previous week (e.g. "↑ 3 highlights · ↓ 1 blocker vs last week").
-
-### Navigating weeks
-Use the week arrows in the header to review any past week's log and summary.
+Create a Power Automate flow that exports your sent emails weekly to a JSON file in your personal OneDrive. The agent reads this file to classify emails as highlights, lowlights, or blockers.
 
 ---
 
-## Generating a summary
+## How to Use It
 
-Click **"Generate Summary"** in the right panel. The summary is cached and can be regenerated at any time.
+1. Throughout the week, log highlights, lowlights, and blockers as they happen in the dashboard
+2. Click **"Sync Jira & Confluence"** to pull your latest Jira activity
+3. Click **"Sync Emails"** to pull your Outlook email export
+4. Click **"Generate Summary"** and select your audience format from the dropdown
+5. Click **"Copy to clipboard"** and paste into the PPM weekly doc, an email, or a 1:1 doc
 
-### Audience formats
-
-The summary supports four audience formats — switch using the dropdown in the summary card:
-
-| Format | Contents | Best for |
-|---|---|---|
-| **PPM Weekly** | Markdown table of highlights + blockers, paste-ready | PPM Weekly Highlights doc |
-| **For stakeholders** | Narrative opening · highlights with bold topics · Jira/email rollups · Relevant Sources | Leadership updates, status emails |
-| **For 1:1** | Everything in stakeholders + Key Decisions + Next Week Preview | Weekly 1:1 with manager |
-| **For myself** | Full detail — all sections including meetings with Jira enrichment | Personal record |
-
-Each format has a **Copy** button that produces clean plain text for Slack, Teams, or a doc.
-
-### What the summary includes
-
-- **Quantitative line** — "This week: 5 highlights · 0 lowlights · 0 blockers | 13 meetings | 3 Jira tickets | 32 emails"
-- **Narrative** — plain-English paragraph with top theme, key wins, and meeting count
-- **Highlights, Lowlights, Blockers** — from manual + synced sources
-- **Key Decisions** — entries and meetings containing decision keywords (aligned, decided, approved, confirmed, etc.)
-- **Meetings** — from calendar, enriched with related Jira ticket entries where keys match
-- **Next Week Preview** — upcoming calendar meetings + items carrying over from blockers/lowlights
-
-### Past Summaries
-
-A **Past Summaries** panel at the bottom of the right column shows all weeks with saved summaries. Click any week to expand and view the summary in whichever audience format is selected. Each row includes a Copy button.
-
-### Terminal report
-
-```bash
-npm run report
-```
-
-Prints a plain-text summary to the terminal — useful for quick reference without opening the browser.
+You can also navigate to any past week using the arrows in the header, and view all previously generated summaries in the **Past Summaries** panel.
 
 ---
 
-## Tech stack
+## Privacy
 
-| Layer | Technology |
-|---|---|
-| Framework | Next.js 15 (App Router) |
-| Database | SQLite via `better-sqlite3` at `~/.weekly-pulse/` |
-| UI | shadcn/ui + Tailwind CSS |
-| Language | TypeScript (strict) |
-| Integrations | Jira REST API, Confluence REST API, Outlook JSON export, ICS calendar feeds |
+All data stays on your machine in a local SQLite database at `~/.weekly-pulse/`. When you share the repo, teammates only get the empty tool — not your data. Each person runs their own instance with their own credentials, calendar, and entries. Nobody sees anyone else's data.
 
 ---
 
-*Built as part of AI Hacks for PMs · Data is local-only and never synced*
+## Links
+
+- **GitHub repo:** https://github.com/himankinis/weekly-pulse
+- **Screenshot:** *(will be added manually)*
+
+---
+
+*[1] Based on estimated time to manually compile weekly highlights, draft 1:1 prep notes, and write stakeholder updates.*
