@@ -4,6 +4,8 @@ A local-first weekly work summarizer for PMs. Captures daily highlights, lowligh
 
 Built as part of the **AI Hacks for PMs** initiative.
 
+![Weekly Pulse dashboard](docs/screenshot.png)
+
 ## What it does
 
 - **Manual entries** — log highlights, lowlights, and blockers from the dashboard
