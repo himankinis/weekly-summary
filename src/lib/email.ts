@@ -7,11 +7,29 @@ import { classifyPrompt } from "./classifier";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+/** Normalized internal shape after parsing the raw JSON */
 export interface EmailRecord {
   subject: string;
   recipients: string | string[];
   date: string; // ISO 8601 or YYYY-MM-DD
   body_snippet: string;
+}
+
+/** Raw shape from the Outlook Graph API export (PascalCase fields) */
+interface RawOutlookEmail {
+  Subject?: string;
+  subject?: string;
+  Recipient?: OutlookRecipient | OutlookRecipient[];
+  Recipients?: OutlookRecipient | OutlookRecipient[];
+  recipients?: string | string[];
+  Date?: string;
+  date?: string;
+  body_snippet?: string;
+  BodyPreview?: string;
+}
+
+interface OutlookRecipient {
+  emailAddress?: { name?: string; address?: string };
 }
 
 export interface EmailSyncResult {
@@ -55,6 +73,30 @@ function formatContent(email: EmailRecord): string {
   return `Sent email: "${email.subject}"${to}`;
 }
 
+/** Normalise a raw Outlook Graph export record into the internal EmailRecord shape */
+function normalizeRawEmail(raw: RawOutlookEmail): EmailRecord {
+  const subject = raw.Subject ?? raw.subject ?? "";
+  const date = raw.Date ?? raw.date ?? "";
+  const body_snippet = raw.body_snippet ?? raw.BodyPreview ?? "";
+
+  // Recipients: handle array of {emailAddress:{name,address}} objects or plain strings
+  const rawRecipients = raw.Recipient ?? raw.Recipients ?? raw.recipients;
+  let recipients: string[];
+  if (!rawRecipients) {
+    recipients = [];
+  } else if (typeof rawRecipients === "string") {
+    recipients = rawRecipients.split(",").map((r) => r.trim()).filter(Boolean);
+  } else {
+    const arr = Array.isArray(rawRecipients) ? rawRecipients : [rawRecipients];
+    recipients = arr.map((r) => {
+      if (typeof r === "string") return r;
+      return r.emailAddress?.name ?? r.emailAddress?.address ?? "";
+    }).filter(Boolean);
+  }
+
+  return { subject, recipients, date, body_snippet };
+}
+
 // ─── Sync ─────────────────────────────────────────────────────────────────────
 
 export function syncEmailToLog(filePath = EMAIL_EXPORT_PATH): EmailSyncResult {
@@ -70,7 +112,10 @@ export function syncEmailToLog(filePath = EMAIL_EXPORT_PATH): EmailSyncResult {
   try {
     const raw = fs.readFileSync(filePath, "utf-8");
     const parsed = JSON.parse(raw);
-    emails = Array.isArray(parsed) ? parsed : parsed.emails ?? parsed.value ?? [];
+    const items: RawOutlookEmail[] = Array.isArray(parsed)
+      ? parsed
+      : parsed.emails ?? parsed.value ?? [];
+    emails = items.map(normalizeRawEmail);
   } catch (err) {
     throw new Error(
       `Cannot read ${filePath}: ${err instanceof Error ? err.message : String(err)}`
