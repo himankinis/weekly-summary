@@ -49,6 +49,8 @@ export interface WeeklySummaryData {
   lowlights: SummaryItem[];
   blockers: SummaryItem[];
   meetings: MeetingSummaryItem[];
+  decisions: SummaryItem[];
+  nextWeekPreview: string[];
   narrative: string; // plain-English paragraph
   stats: WeekStats;
 }
@@ -63,6 +65,7 @@ export interface MeetingSummaryItem {
   title: string;
   date: string;
   attendee_count: number;
+  related?: string[]; // Jira-key matched entry contents
 }
 
 export interface WeekStats {
@@ -72,6 +75,8 @@ export interface WeekStats {
   blocker_count: number;
   meeting_count: number;
   days_active: number;
+  jira_count: number;
+  email_count: number;
 }
 
 export interface WeeklySummary {

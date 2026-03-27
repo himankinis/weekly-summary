@@ -3,17 +3,14 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Select } from "@/components/ui/select";
 import {
-  Loader2,
-  Copy,
-  Download,
-  CheckCheck,
-  Sparkles,
-  RefreshCw,
+  Loader2, Copy, Download, CheckCheck, Sparkles, RefreshCw,
 } from "lucide-react";
 import { format, parseISO, addDays } from "date-fns";
-import type { WeeklySummaryData } from "@/lib/types";
+import type { WeeklySummaryData, SummaryItem } from "@/lib/types";
+
+type Audience = "self" | "manager" | "stakeholders";
 
 interface Props {
   weekStart: string;
@@ -24,6 +21,7 @@ export default function SummaryPanel({ weekStart }: Props) {
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [audience, setAudience] = useState<Audience>("self");
 
   const generate = async (force = false) => {
     setLoading(true);
@@ -41,7 +39,6 @@ export default function SummaryPanel({ weekStart }: Props) {
       }
       const json = await res.json();
       if (!json.ok) throw new Error(json.error);
-      // API returns { data: { summary } } for fresh, or { data: { summary, summary_json } } for cached
       setSummary(json.data.summary);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to generate summary");
@@ -50,36 +47,59 @@ export default function SummaryPanel({ weekStart }: Props) {
     }
   };
 
-  const copyToClipboard = async () => {
-    if (!summary) return;
+  const buildCopyText = (s: WeeklySummaryData, aud: Audience): string => {
     const lines: string[] = [];
-    const weekRange = `${format(parseISO(summary.weekStart), "MMM d")}–${format(parseISO(summary.weekEnd), "MMM d")}`;
+    const weekRange = `${format(parseISO(s.weekStart), "MMM d")}–${format(parseISO(s.weekEnd), "MMM d")}`;
+
     lines.push(`Weekly Summary — ${weekRange}`);
     lines.push("");
-    lines.push(summary.narrative);
+    lines.push(quantLine(s));
+    lines.push("");
+    lines.push(s.narrative);
     lines.push("");
 
-    if (summary.highlights.length > 0) {
+    const highlights = audienceHighlights(s, aud);
+    if (highlights.length > 0) {
       lines.push("✅ Highlights");
-      summary.highlights.forEach((h) => lines.push(`• ${h.content}`));
+      highlights.forEach((h) => lines.push(`• ${h.content}`));
       lines.push("");
-    }
-    if (summary.lowlights.length > 0) {
-      lines.push("⚠️ Lowlights");
-      summary.lowlights.forEach((l) => lines.push(`• ${l.content}`));
-      lines.push("");
-    }
-    if (summary.blockers.length > 0) {
-      lines.push("🚫 Blockers");
-      summary.blockers.forEach((b) => lines.push(`• ${b.content}`));
-      lines.push("");
-    }
-    if (summary.meetings.length > 0) {
-      lines.push("📅 Meetings");
-      summary.meetings.forEach((m) => lines.push(`• ${m.title}`));
     }
 
-    await navigator.clipboard.writeText(lines.join("\n"));
+    if (aud !== "stakeholders" && s.lowlights.length > 0) {
+      lines.push("⚠️ Lowlights");
+      s.lowlights.forEach((l) => lines.push(`• ${l.content}`));
+      lines.push("");
+    }
+
+    if (s.blockers.length > 0) {
+      lines.push("🚫 Blockers");
+      s.blockers.forEach((b) => lines.push(`• ${b.content}`));
+      lines.push("");
+    }
+
+    if (aud !== "stakeholders" && s.decisions.length > 0) {
+      lines.push("🎯 Key Decisions");
+      s.decisions.forEach((d) => lines.push(`• ${d.content}`));
+      lines.push("");
+    }
+
+    if (aud === "self" && s.meetings.length > 0) {
+      lines.push("📅 Meetings");
+      s.meetings.forEach((m) => lines.push(`• ${m.title}`));
+      lines.push("");
+    }
+
+    if (aud !== "stakeholders" && s.nextWeekPreview.length > 0) {
+      lines.push("🔭 Next Week");
+      s.nextWeekPreview.forEach((p) => lines.push(`• ${p}`));
+    }
+
+    return lines.join("\n");
+  };
+
+  const copyToClipboard = async () => {
+    if (!summary) return;
+    await navigator.clipboard.writeText(buildCopyText(summary, audience));
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -94,41 +114,37 @@ export default function SummaryPanel({ weekStart }: Props) {
   return (
     <Card>
       <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-2">
           <CardTitle className="text-base flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-primary" />
             Weekly Summary
           </CardTitle>
-          {summary && (
-            <div className="flex gap-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => generate(true)}
-                disabled={loading}
-                title="Regenerate"
-              >
-                <RefreshCw className="h-3.5 w-3.5" />
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={copyToClipboard}
-                disabled={copied}
-              >
-                {copied ? (
-                  <CheckCheck className="h-3.5 w-3.5 mr-1.5 text-green-600" />
-                ) : (
-                  <Copy className="h-3.5 w-3.5 mr-1.5" />
-                )}
-                {copied ? "Copied!" : "Copy"}
-              </Button>
-              <Button variant="outline" size="sm" onClick={downloadMarkdown}>
-                <Download className="h-3.5 w-3.5 mr-1.5" />
-                .md
-              </Button>
-            </div>
-          )}
+          <div className="flex items-center gap-2">
+            {summary && (
+              <>
+                <Select
+                  value={audience}
+                  onChange={(e) => setAudience(e.target.value as Audience)}
+                  className="h-7 text-xs py-0 px-2 w-auto"
+                >
+                  <option value="self">For myself</option>
+                  <option value="manager">For 1:1</option>
+                  <option value="stakeholders">For stakeholders</option>
+                </Select>
+                <Button variant="ghost" size="sm" onClick={() => generate(true)} disabled={loading} title="Regenerate">
+                  <RefreshCw className="h-3.5 w-3.5" />
+                </Button>
+                <Button variant="outline" size="sm" onClick={copyToClipboard} disabled={copied}>
+                  {copied ? <CheckCheck className="h-3.5 w-3.5 mr-1.5 text-green-600" /> : <Copy className="h-3.5 w-3.5 mr-1.5" />}
+                  {copied ? "Copied!" : "Copy"}
+                </Button>
+                <Button variant="outline" size="sm" onClick={downloadMarkdown}>
+                  <Download className="h-3.5 w-3.5 mr-1.5" />
+                  .md
+                </Button>
+              </>
+            )}
+          </div>
         </div>
       </CardHeader>
 
@@ -153,43 +169,72 @@ export default function SummaryPanel({ weekStart }: Props) {
         )}
 
         {error && (
-          <div className="rounded-md bg-destructive/10 text-destructive px-4 py-3 text-sm">
-            {error}
-          </div>
+          <div className="rounded-md bg-destructive/10 text-destructive px-4 py-3 text-sm">{error}</div>
         )}
 
         {summary && !loading && (
-          <div className="space-y-5">
-            {/* Stats row */}
-            <div className="flex flex-wrap gap-2">
-              <StatBadge label="Highlights" count={summary.stats.highlight_count} color="green" />
-              <StatBadge label="Lowlights" count={summary.stats.lowlight_count} color="amber" />
-              <StatBadge label="Blockers" count={summary.stats.blocker_count} color="red" />
-              <StatBadge label="Meetings" count={summary.stats.meeting_count} color="blue" />
-              <StatBadge label="Active days" count={summary.stats.days_active} color="slate" />
-            </div>
+          <div className="space-y-4">
+            {/* Quantitative line */}
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              {quantLine(summary)}
+            </p>
 
             {/* Narrative */}
             <blockquote className="border-l-2 border-primary/40 pl-3 text-sm text-muted-foreground italic">
               {summary.narrative}
             </blockquote>
 
-            {/* Sections */}
-            {summary.highlights.length > 0 && (
-              <SummarySection title="✅ Highlights" items={summary.highlights.map((h) => h.content)} />
+            {/* Highlights */}
+            {audienceHighlights(summary, audience).length > 0 && (
+              <SummarySection
+                title="✅ Highlights"
+                items={audienceHighlights(summary, audience).map((h) => ({
+                  text: h.content,
+                  badge: h.source !== "manual" ? h.source : undefined,
+                }))}
+              />
             )}
-            {summary.lowlights.length > 0 && (
-              <SummarySection title="⚠️ Lowlights" items={summary.lowlights.map((l) => l.content)} />
+
+            {/* Lowlights — hidden for stakeholders */}
+            {audience !== "stakeholders" && summary.lowlights.length > 0 && (
+              <SummarySection
+                title="⚠️ Lowlights"
+                items={summary.lowlights.map((l) => ({ text: l.content }))}
+              />
             )}
+
+            {/* Blockers */}
             {summary.blockers.length > 0 && (
-              <SummarySection title="🚫 Blockers" items={summary.blockers.map((b) => b.content)} />
+              <SummarySection
+                title="🚫 Blockers"
+                items={summary.blockers.map((b) => ({ text: b.content }))}
+              />
             )}
-            {summary.meetings.length > 0 && (
+
+            {/* Key Decisions — hidden for stakeholders */}
+            {audience !== "stakeholders" && summary.decisions.length > 0 && (
+              <SummarySection
+                title="🎯 Key Decisions"
+                items={summary.decisions.map((d) => ({ text: d.content }))}
+              />
+            )}
+
+            {/* Meetings — only for "self" */}
+            {audience === "self" && summary.meetings.length > 0 && (
               <SummarySection
                 title="📅 Meetings"
-                items={summary.meetings.map(
-                  (m) => `${m.title}${m.attendee_count > 0 ? ` (${m.attendee_count} attendees)` : ""}`
-                )}
+                items={summary.meetings.map((m) => ({
+                  text: m.title + (m.attendee_count > 0 ? ` (${m.attendee_count})` : ""),
+                  sub: m.related?.map((r) => `Related: ${r}`),
+                }))}
+              />
+            )}
+
+            {/* Next week — hidden for stakeholders */}
+            {audience !== "stakeholders" && summary.nextWeekPreview.length > 0 && (
+              <SummarySection
+                title="🔭 Next Week"
+                items={summary.nextWeekPreview.map((p) => ({ text: p }))}
               />
             )}
           </div>
@@ -199,40 +244,58 @@ export default function SummaryPanel({ weekStart }: Props) {
   );
 }
 
-function StatBadge({
-  label,
-  count,
-  color,
-}: {
-  label: string;
-  count: number;
-  color: "green" | "amber" | "red" | "blue" | "slate";
-}) {
-  const colorMap = {
-    green: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
-    amber: "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200",
-    red: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
-    blue: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
-    slate: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
-  };
-  return (
-    <span
-      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${colorMap[color]}`}
-    >
-      <strong>{count}</strong> {label}
-    </span>
-  );
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function quantLine(s: WeeklySummaryData): string {
+  const parts = [
+    `${s.stats.highlight_count} highlight${s.stats.highlight_count !== 1 ? "s" : ""}`,
+    `${s.stats.lowlight_count} lowlight${s.stats.lowlight_count !== 1 ? "s" : ""}`,
+    `${s.stats.blocker_count} blocker${s.stats.blocker_count !== 1 ? "s" : ""}`,
+  ].join(" · ");
+  const extras: string[] = [];
+  if (s.stats.meeting_count > 0) extras.push(`${s.stats.meeting_count} meetings`);
+  if (s.stats.jira_count > 0) extras.push(`${s.stats.jira_count} Jira tickets`);
+  if (s.stats.email_count > 0) extras.push(`${s.stats.email_count} emails`);
+  return `This week: ${parts}${extras.length > 0 ? " | " + extras.join(" | ") : ""}`;
 }
 
-function SummarySection({ title, items }: { title: string; items: string[] }) {
+function audienceHighlights(s: WeeklySummaryData, audience: Audience): SummaryItem[] {
+  if (audience === "stakeholders") {
+    return s.highlights.filter((h) => h.source === "manual").slice(0, 3);
+  }
+  if (audience === "manager") {
+    return s.highlights.slice(0, 5);
+  }
+  return s.highlights;
+}
+
+// ─── Sub-components ───────────────────────────────────────────────────────────
+
+function SummarySection({
+  title,
+  items,
+}: {
+  title: string;
+  items: { text: string; badge?: string; sub?: string[] }[];
+}) {
   return (
     <div>
-      <h4 className="text-sm font-semibold mb-2">{title}</h4>
-      <ul className="space-y-1">
+      <h4 className="text-sm font-semibold mb-1.5">{title}</h4>
+      <ul className="space-y-1.5">
         {items.map((item, i) => (
-          <li key={i} className="text-sm flex items-start gap-2">
-            <span className="text-muted-foreground mt-1 text-xs">•</span>
-            <span>{item}</span>
+          <li key={i} className="text-sm">
+            <div className="flex items-start gap-2">
+              <span className="text-muted-foreground mt-1 text-xs shrink-0">•</span>
+              <span>
+                {item.text}
+                {item.badge && (
+                  <span className="ml-1.5 text-xs text-muted-foreground">({item.badge})</span>
+                )}
+              </span>
+            </div>
+            {item.sub && item.sub.map((s, j) => (
+              <p key={j} className="ml-4 text-xs text-muted-foreground italic mt-0.5">{s}</p>
+            ))}
           </li>
         ))}
       </ul>
