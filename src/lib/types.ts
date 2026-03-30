@@ -1,6 +1,6 @@
 // ─── Entry Types ──────────────────────────────────────────────────────────────
 
-export type EntryType = "highlight" | "lowlight" | "blocker";
+export type EntryType = "highlight" | "lowlight" | "blocker" | "todo";
 export type EntrySource = "manual" | "hook" | "calendar" | "jira" | "confluence" | "email";
 
 export interface LogEntry {
@@ -12,6 +12,8 @@ export interface LogEntry {
   calendar_uid: string | null;
   entry_date: string; // YYYY-MM-DD
   week_start: string; // YYYY-MM-DD (Monday)
+  completed: number; // 0 or 1
+  completed_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -48,6 +50,7 @@ export interface WeeklySummaryData {
   highlights: SummaryItem[];
   lowlights: SummaryItem[];
   blockers: SummaryItem[];
+  todos: SummaryItem[];
   meetings: MeetingSummaryItem[];
   decisions: SummaryItem[];
   nextWeekPreview: string[];
@@ -73,6 +76,7 @@ export interface WeekStats {
   highlight_count: number;
   lowlight_count: number;
   blocker_count: number;
+  todo_count?: number;
   meeting_count: number;
   days_active: number;
   jira_count: number;

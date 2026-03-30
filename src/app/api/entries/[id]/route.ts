@@ -33,7 +33,7 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params;
-    const body: Partial<{ content: string; type: string }> = await req.json();
+    const body: Partial<{ content: string; type: string; completed: boolean }> = await req.json();
     const db = getDb();
 
     const entry = db
@@ -47,16 +47,24 @@ export async function PATCH(
     const newContent = body.content?.trim() ?? entry.content;
     const newType = body.type ?? entry.type;
 
-    if (!["highlight", "lowlight", "blocker"].includes(newType)) {
+    if (!["highlight", "lowlight", "blocker", "todo"].includes(newType)) {
       return NextResponse.json(
         { ok: false, error: "invalid type" },
         { status: 400 }
       );
     }
 
+    const newCompleted = body.completed !== undefined ? (body.completed ? 1 : 0) : entry.completed;
+    const newCompletedAt =
+      body.completed !== undefined
+        ? body.completed
+          ? new Date().toISOString()
+          : null
+        : entry.completed_at;
+
     db.prepare(
-      `UPDATE log_entries SET content = ?, type = ?, updated_at = datetime('now') WHERE id = ?`
-    ).run(newContent, newType, id);
+      `UPDATE log_entries SET content = ?, type = ?, completed = ?, completed_at = ?, updated_at = datetime('now') WHERE id = ?`
+    ).run(newContent, newType, newCompleted, newCompletedAt, id);
 
     const updated = db
       .prepare(`SELECT * FROM log_entries WHERE id = ?`)

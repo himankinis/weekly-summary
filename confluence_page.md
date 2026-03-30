@@ -18,7 +18,7 @@ All data stays on your machine in a local SQLite database — nothing is sent to
 
 ## What It Does
 
-- **Manual entries** — log highlights, lowlights, and blockers directly from the dashboard; these always take priority in the summary
+- **Manual entries** — log highlights, lowlights, blockers, and to-dos directly from the dashboard; these always take priority in the summary
 - **Jira tickets** — syncs resolved, in-progress, and blocked tickets; translates status into accomplishments: "Completed X (Jira: KEY-123)", "Drove progress on X", "Initiated X"
 - **Confluence pages** — syncs pages you created or edited; surfaces as "Published X on Confluence" or "Updated X on Confluence"
 - **Outlook emails** — groups email threads by topic and synthesizes into PM actions: "Led cross-functional discussion on X (N touchpoints)", "Aligned with Y on Z", "Discussed X with Y" — raw "Sent email: subject" lines are never shown
@@ -109,9 +109,22 @@ Click **"Sync Jira & Confluence"** and **"Sync Emails"** in the dashboard to pul
 
 ---
 
+## Entry Types
+
+| Type | Meaning |
+|---|---|
+| ✅ Highlight | Accomplishment, shipped work, good decision |
+| ⚠️ Lowlight | Delay, missed target, thing that took longer |
+| 🚫 Blocker | Dependency, access issue, waiting on others |
+| 📋 To-do | Task to complete this week or next — check it off when done |
+
+To-dos appear as a dedicated **📝 To-dos** section in the weekly summary. Completed to-dos are automatically excluded from the summary.
+
+---
+
 ## How to Use It
 
-1. Throughout the week, log highlights, lowlights, and blockers as they happen in the dashboard
+1. Throughout the week, log highlights, lowlights, blockers, and to-dos as they happen in the dashboard; check off to-dos as you complete them
 2. Click **"Sync Jira & Confluence"** to pull your latest Jira tickets and Confluence pages
 3. Click **"Sync Emails"** to pull your Outlook email export
 4. Click **"Generate Summary"** and select your audience format from the dropdown

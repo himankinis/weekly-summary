@@ -5,7 +5,7 @@
 CREATE TABLE IF NOT EXISTS log_entries (
   id            INTEGER PRIMARY KEY AUTOINCREMENT,
   content       TEXT    NOT NULL,
-  type          TEXT    NOT NULL CHECK (type IN ('highlight', 'lowlight', 'blocker')),
+  type          TEXT    NOT NULL CHECK (type IN ('highlight', 'lowlight', 'blocker', 'todo')),
   source        TEXT    NOT NULL DEFAULT 'manual' CHECK (source IN ('manual', 'hook', 'calendar', 'jira', 'confluence', 'email')),
   -- For hook-captured entries: the raw prompt text
   raw_prompt    TEXT,
@@ -15,6 +15,8 @@ CREATE TABLE IF NOT EXISTS log_entries (
   entry_date    TEXT    NOT NULL,
   -- Monday of the week this entry belongs to (YYYY-MM-DD)
   week_start    TEXT    NOT NULL,
+  completed     INTEGER NOT NULL DEFAULT 0,
+  completed_at  TEXT,
   created_at    TEXT    NOT NULL DEFAULT (datetime('now')),
   updated_at    TEXT    NOT NULL DEFAULT (datetime('now'))
 );

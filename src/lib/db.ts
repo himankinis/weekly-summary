@@ -33,6 +33,8 @@ export function getDb(): Database.Database {
 
   // Migrate existing DBs to support jira/confluence sources
   migrateSourceConstraint(_db);
+  // Migrate existing DBs to add completed state for todos
+  migrateCompletedColumn(_db);
 
   return _db;
 }
@@ -65,6 +67,50 @@ function migrateSourceConstraint(db: Database.Database): void {
 
     INSERT INTO log_entries SELECT * FROM _log_entries_v1;
     DROP TABLE _log_entries_v1;
+
+    CREATE INDEX IF NOT EXISTS idx_log_entries_week_start  ON log_entries (week_start);
+    CREATE INDEX IF NOT EXISTS idx_log_entries_entry_date  ON log_entries (entry_date);
+    CREATE INDEX IF NOT EXISTS idx_log_entries_type        ON log_entries (type);
+    CREATE INDEX IF NOT EXISTS idx_log_entries_source      ON log_entries (source);
+  `);
+}
+
+/** Adds todo type + completed/completed_at columns if they don't exist yet */
+function migrateCompletedColumn(db: Database.Database): void {
+  const row = db
+    .prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='log_entries'")
+    .get() as { sql: string } | undefined;
+  if (!row) return;
+
+  const hasTodo = row.sql.includes("'todo'");
+  const hasCompleted = row.sql.includes("completed");
+
+  if (hasTodo && hasCompleted) return;
+
+  // Recreate table to update the type CHECK constraint and add completed columns
+  db.exec(`
+    ALTER TABLE log_entries RENAME TO _log_entries_v2;
+
+    CREATE TABLE log_entries (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      content       TEXT    NOT NULL,
+      type          TEXT    NOT NULL CHECK (type IN ('highlight', 'lowlight', 'blocker', 'todo')),
+      source        TEXT    NOT NULL DEFAULT 'manual' CHECK (source IN ('manual', 'hook', 'calendar', 'jira', 'confluence', 'email')),
+      raw_prompt    TEXT,
+      calendar_uid  TEXT,
+      entry_date    TEXT    NOT NULL,
+      week_start    TEXT    NOT NULL,
+      completed     INTEGER NOT NULL DEFAULT 0,
+      completed_at  TEXT,
+      created_at    TEXT    NOT NULL DEFAULT (datetime('now')),
+      updated_at    TEXT    NOT NULL DEFAULT (datetime('now'))
+    );
+
+    INSERT INTO log_entries (id, content, type, source, raw_prompt, calendar_uid, entry_date, week_start, created_at, updated_at)
+      SELECT id, content, type, source, raw_prompt, calendar_uid, entry_date, week_start, created_at, updated_at
+      FROM _log_entries_v2;
+
+    DROP TABLE _log_entries_v2;
 
     CREATE INDEX IF NOT EXISTS idx_log_entries_week_start  ON log_entries (week_start);
     CREATE INDEX IF NOT EXISTS idx_log_entries_entry_date  ON log_entries (entry_date);

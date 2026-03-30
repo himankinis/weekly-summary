@@ -79,6 +79,10 @@ export default function Dashboard() {
     setEntries((prev) => prev.filter((e) => e.id !== id));
   };
 
+  const handleEntryUpdated = (updated: LogEntry) => {
+    setEntries((prev) => prev.map((e) => (e.id === updated.id ? updated : e)));
+  };
+
   const highlightCount = entries.filter((e) => e.type === "highlight" && e.source !== "hook").length;
   const lowlightCount  = entries.filter((e) => e.type === "lowlight"  && e.source !== "hook").length;
   const blockerCount   = entries.filter((e) => e.type === "blocker"   && e.source !== "hook").length;
@@ -147,7 +151,7 @@ export default function Dashboard() {
                 {loading ? (
                   <div className="py-8 text-center text-sm text-muted-foreground">Loading…</div>
                 ) : (
-                  <EntryList entries={entries} onDelete={handleEntryDeleted} />
+                  <EntryList entries={entries} onDelete={handleEntryDeleted} onUpdate={handleEntryUpdated} />
                 )}
               </CardContent>
             </Card>

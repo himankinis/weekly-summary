@@ -8,7 +8,7 @@ Built as part of the **AI Hacks for PMs** initiative.
 
 ## What it does
 
-- **Manual entries** — log highlights, lowlights, and blockers directly from the dashboard
+- **Manual entries** — log highlights, lowlights, blockers, and to-dos directly from the dashboard
 - **Jira via API** — syncs tickets and translates status into accomplishments: "Completed X", "Drove progress on X", "Initiated X"
 - **Confluence via API** — syncs pages you created or edited; surfaces as "Published X on Confluence"
 - **Outlook emails via Power Automate** — groups email threads by topic and synthesizes into PM actions: "Led cross-functional discussion on X", "Aligned with Y on Z", "Drove alignment on X with Y (N touchpoints)"
@@ -109,6 +109,9 @@ Click **"Sync Jira & Confluence"** in the dashboard to pull this week's tickets 
 | ✅ Highlight | Accomplishment, shipped work, good decision |
 | ⚠️ Lowlight | Delay, missed target, thing that took longer |
 | 🚫 Blocker | Dependency, access issue, waiting on others |
+| 📋 To-do | Task to complete this week or next — check it off when done |
+
+To-dos appear as a dedicated section in the weekly summary. Completed to-dos are excluded from the summary automatically.
 
 ## Tech stack
 

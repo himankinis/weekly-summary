@@ -32,9 +32,9 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
-    if (!["highlight", "lowlight", "blocker"].includes(body.type)) {
+    if (!["highlight", "lowlight", "blocker", "todo"].includes(body.type)) {
       return NextResponse.json(
-        { ok: false, error: "type must be highlight, lowlight, or blocker" },
+        { ok: false, error: "type must be highlight, lowlight, blocker, or todo" },
         { status: 400 }
       );
     }

@@ -17,6 +17,8 @@ const DECISION_KEYWORDS =
 
 const JIRA_KEY_PATTERN = /\b([A-Z]+-\d+)\b/g;
 
+const TODO_PATTERN = /\b(todo|to do|todo:)\b/i;
+
 // ─── Email Synthesis ──────────────────────────────────────────────────────────
 
 interface ParsedEmail {
@@ -255,6 +257,20 @@ function synthesizeConfluence(entries: LogEntry[]): SummaryItem[] {
     });
 }
 
+function synthesizeTodos(entries: LogEntry[]): SummaryItem[] {
+  const seen = new Set<number>();
+  return entries
+    .filter((e) => {
+      if ((e.type === "todo" || TODO_PATTERN.test(e.content)) && !e.completed) {
+        if (seen.has(e.id)) return false;
+        seen.add(e.id);
+        return true;
+      }
+      return false;
+    })
+    .map((e) => ({ content: e.content.trim(), source: e.source, date: e.entry_date }));
+}
+
 // ─── Calendar Filtering ───────────────────────────────────────────────────────
 
 const ROUTINE_MEETING_PATTERNS = [
@@ -313,7 +329,7 @@ export function generateWeeklySummary(weekStart?: string): WeeklySummaryData {
     .all(nextWeekStart) as CalendarEvent[];
 
   // ── Manual entries — highest trust, used as-is ─────────────────────────────
-  const manualEntries = entries.filter((e) => e.source === "manual");
+  const manualEntries = entries.filter((e) => e.source === "manual" && e.type !== "todo");
   const manualHighlights: SummaryItem[] = manualEntries
     .filter((e) => e.type === "highlight")
     .map((e) => ({ content: e.content, source: e.source, date: e.entry_date }));
@@ -328,6 +344,7 @@ export function generateWeeklySummary(weekStart?: string): WeeklySummaryData {
   const confluenceItems = synthesizeConfluence(entries);
   const jira = synthesizeJira(entries);
   const emailHighlights = synthesizeEmails(entries);
+  const todos = synthesizeTodos(entries);
 
   // ── Merge with priority order and enforce limits ───────────────────────────
   // manual > confluence > jira > email; max 5 highlights, 3 blockers
@@ -364,10 +381,11 @@ export function generateWeeklySummary(weekStart?: string): WeeklySummaryData {
   ]);
 
   const stats: WeekStats = {
-    total_entries: manualEntries.length,
+    total_entries: entries.filter((e) => e.source === "manual").length,
     highlight_count: highlights.length,
     lowlight_count: lowlights.length,
     blocker_count: blockers.length,
+    todo_count: todos.length,
     meeting_count: meetings.length,
     days_active: activeDays.size,
     jira_count: entries.filter((e) => e.source === "jira").length,
@@ -380,6 +398,7 @@ export function generateWeeklySummary(weekStart?: string): WeeklySummaryData {
     weekStart: ws,
     weekEnd,
     highlights,
+    todos,
     lowlights,
     blockers,
     meetings,
@@ -563,6 +582,15 @@ export function summaryToMarkdown(summary: WeeklySummaryData): string {
     lines.push("");
   }
 
+  if (summary.todos && summary.todos.length > 0) {
+    lines.push("## 📝 To-dos");
+    for (const t of summary.todos) {
+      const badge = t.source !== "manual" ? ` *(${t.source})*` : "";
+      lines.push(`- ${t.content}${badge}`);
+    }
+    lines.push("");
+  }
+
   if (summary.lowlights.length > 0) {
     lines.push("## ⚠️ Lowlights");
     for (const l of summary.lowlights) lines.push(`- ${l.content}`);
@@ -622,6 +650,16 @@ export function summaryToText(summary: WeeklySummaryData): string {
     lines.push("HIGHLIGHTS");
     lines.push("-".repeat(30));
     for (const h of summary.highlights) lines.push(`  ✓ ${h.content}`);
+    lines.push("");
+  }
+
+  if (summary.todos && summary.todos.length > 0) {
+    lines.push("TODOS");
+    lines.push("-".repeat(30));
+    for (const t of summary.todos) {
+      const badge = t.source !== "manual" ? ` (${t.source})` : "";
+      lines.push(`  - ${t.content}${badge}`);
+    }
     lines.push("");
   }
 

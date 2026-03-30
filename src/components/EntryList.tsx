@@ -13,15 +13,17 @@ import type { EntryType, EntrySource, LogEntry } from "@/lib/types";
 interface Props {
   entries: LogEntry[];
   onDelete: (id: number) => void;
+  onUpdate: (entry: LogEntry) => void;
 }
 
 const TYPE_CONFIG: Record<
   EntryType,
-  { label: string; emoji: string; badgeVariant: "highlight" | "lowlight" | "blocker"; groupLabel: string }
+  { label: string; emoji: string; badgeVariant: "highlight" | "lowlight" | "blocker" | "todo"; groupLabel: string }
 > = {
   highlight: { label: "Highlight", emoji: "✅", badgeVariant: "highlight", groupLabel: "Highlights" },
   lowlight:  { label: "Lowlight",  emoji: "⚠️", badgeVariant: "lowlight",  groupLabel: "Lowlights"  },
   blocker:   { label: "Blocker",   emoji: "🚫", badgeVariant: "blocker",   groupLabel: "Blockers"   },
+  todo:      { label: "To-do",     emoji: "📋", badgeVariant: "todo",      groupLabel: "To-dos"     },
 };
 
 interface SourceConfig {
@@ -52,8 +54,9 @@ function SourcePill({ source }: { source: EntrySource }) {
   );
 }
 
-function EntryRow({ entry, onDelete }: { entry: LogEntry; onDelete: (id: number) => void }) {
+function EntryRow({ entry, onDelete, onUpdate }: { entry: LogEntry; onDelete: (id: number) => void; onUpdate: (entry: LogEntry) => void }) {
   const [deleting, setDeleting] = useState(false);
+  const [toggling, setToggling] = useState(false);
   const cfg = TYPE_CONFIG[entry.type];
 
   const handleDelete = async () => {
@@ -67,16 +70,57 @@ function EntryRow({ entry, onDelete }: { entry: LogEntry; onDelete: (id: number)
     }
   };
 
+  const handleToggleComplete = async () => {
+    setToggling(true);
+    try {
+      const res = await fetch(`/api/entries/${entry.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ completed: !entry.completed }),
+      });
+      const json = await res.json();
+      if (json.ok) onUpdate(json.data as LogEntry);
+    } finally {
+      setToggling(false);
+    }
+  };
+
+  const isTodo = entry.type === "todo";
+  const isDone = isTodo && Boolean(entry.completed);
+
   return (
     <div className="group flex items-start gap-3 py-2.5 border-b border-border/50 last:border-0">
-      <span className="mt-0.5 text-base leading-none">{cfg.emoji}</span>
+      {isTodo ? (
+        <button
+          onClick={handleToggleComplete}
+          disabled={toggling}
+          title={isDone ? "Mark incomplete" : "Mark complete"}
+          className={[
+            "mt-0.5 flex-shrink-0 h-4 w-4 rounded border transition-colors",
+            isDone
+              ? "bg-blue-500 border-blue-500 text-white flex items-center justify-center"
+              : "border-border hover:border-blue-400",
+          ].join(" ")}
+        >
+          {isDone && (
+            <svg className="h-2.5 w-2.5" viewBox="0 0 10 10" fill="none">
+              <path d="M1.5 5l2.5 2.5 4.5-4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          )}
+        </button>
+      ) : (
+        <span className="mt-0.5 text-base leading-none">{cfg.emoji}</span>
+      )}
       <div className="flex-1 min-w-0">
-        <p className="text-sm leading-relaxed">{entry.content}</p>
+        <p className={["text-sm leading-relaxed", isDone ? "line-through text-muted-foreground" : ""].join(" ")}>
+          {entry.content}
+        </p>
         <div className="flex items-center gap-2 mt-1.5">
           <SourcePill source={entry.source} />
           <span className="text-xs text-muted-foreground">
             {format(parseISO(entry.entry_date), "EEE MMM d")}
           </span>
+          {isDone && <span className="text-xs text-blue-500 font-medium">Done</span>}
         </div>
       </div>
       <Button
@@ -193,7 +237,7 @@ function CollapsibleSection({
   );
 }
 
-export default function EntryList({ entries, onDelete }: Props) {
+export default function EntryList({ entries, onDelete, onUpdate }: Props) {
   const [viewMode, setViewMode] = useState<"type" | "source">("type");
 
   if (entries.length === 0) {
@@ -235,7 +279,7 @@ export default function EntryList({ entries, onDelete }: Props) {
       {viewMode === "type" ? (
         // ── Type-grouped view (original) ──────────────────────────────────
         <>
-          {(["highlight", "lowlight", "blocker"] as EntryType[])
+          {(["highlight", "lowlight", "blocker", "todo"] as EntryType[])
             .map((type) => ({ type, cfg: TYPE_CONFIG[type], items: manualEntries.filter((e) => e.type === type) }))
             .filter((g) => g.items.length > 0)
             .map(({ type, cfg, items }) => (
@@ -245,7 +289,7 @@ export default function EntryList({ entries, onDelete }: Props) {
                   <Badge variant={cfg.badgeVariant} className="text-xs px-1.5 py-0">{items.length}</Badge>
                 </div>
                 {items.map((entry) => (
-                  <EntryRow key={entry.id} entry={entry} onDelete={onDelete} />
+                  <EntryRow key={entry.id} entry={entry} onDelete={onDelete} onUpdate={onUpdate} />
                 ))}
               </div>
             ))}
@@ -282,7 +326,7 @@ export default function EntryList({ entries, onDelete }: Props) {
                   entry.source === "hook" ? (
                     <HookActivityRow key={entry.id} entry={entry} onDelete={onDelete} />
                   ) : (
-                    <EntryRow key={entry.id} entry={entry} onDelete={onDelete} />
+                    <EntryRow key={entry.id} entry={entry} onDelete={onDelete} onUpdate={onUpdate} />
                   )
                 )}
               </CollapsibleSection>

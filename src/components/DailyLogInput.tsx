@@ -14,6 +14,7 @@ const TYPE_OPTIONS: { value: EntryType; label: string; emoji: string; descriptio
   { value: "highlight", label: "Highlight", emoji: "✅", description: "Win, shipped work, good decision" },
   { value: "lowlight", label: "Lowlight", emoji: "⚠️", description: "Delay, missed target, took longer" },
   { value: "blocker", label: "Blocker", emoji: "🚫", description: "Dependency, access issue, waiting on someone" },
+  { value: "todo", label: "To-do", emoji: "📋", description: "Task to complete this week or next" },
 ];
 
 export default function DailyLogInput({ onEntryAdded }: Props) {
@@ -73,7 +74,9 @@ export default function DailyLogInput({ onEntryAdded }: Props) {
                   ? "bg-green-100 border-green-400 text-green-800 dark:bg-green-900 dark:text-green-200 dark:border-green-600"
                   : opt.value === "lowlight"
                   ? "bg-amber-100 border-amber-400 text-amber-800 dark:bg-amber-900 dark:text-amber-200 dark:border-amber-600"
-                  : "bg-red-100 border-red-400 text-red-800 dark:bg-red-900 dark:text-red-200 dark:border-red-600"
+                  : opt.value === "blocker"
+                  ? "bg-red-100 border-red-400 text-red-800 dark:bg-red-900 dark:text-red-200 dark:border-red-600"
+                  : "bg-blue-100 border-blue-400 text-blue-800 dark:bg-blue-900 dark:text-blue-200 dark:border-blue-600"
                 : "bg-transparent border-border text-muted-foreground hover:border-foreground/30",
             ].join(" ")}
           >
@@ -95,7 +98,9 @@ export default function DailyLogInput({ onEntryAdded }: Props) {
               ? "What did you ship, accomplish, or decide?"
               : type === "lowlight"
               ? "What took longer, slipped, or didn't go well?"
-              : "What's blocking you or what are you waiting on?"
+              : type === "blocker"
+              ? "What's blocking you or what are you waiting on?"
+              : "What do you need to get done this week?"
           }
           rows={3}
           className="resize-none pr-24"
