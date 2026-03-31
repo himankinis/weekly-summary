@@ -8,6 +8,7 @@ import SummaryPanel from "@/components/SummaryPanel";
 import CalendarPanel from "@/components/CalendarPanel";
 import AtlassianPanel from "@/components/AtlassianPanel";
 import EmailPanel from "@/components/EmailPanel";
+import TodosPanel from "@/components/TodosPanel";
 import WeekNav from "@/components/WeekNav";
 import PastSummariesPanel from "@/components/PastSummariesPanel";
 import { format, subDays, parseISO } from "date-fns";
@@ -135,6 +136,8 @@ export default function Dashboard() {
                 <DailyLogInput onEntryAdded={handleEntryAdded} />
               </CardContent>
             </Card>
+
+            <TodosPanel weekStart={weekStart} />
 
             <Card>
               <CardHeader className="pb-3">

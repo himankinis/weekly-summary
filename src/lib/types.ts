@@ -14,6 +14,7 @@ export interface LogEntry {
   week_start: string; // YYYY-MM-DD (Monday)
   completed: number; // 0 or 1
   completed_at: string | null;
+  carried_from_id: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -50,7 +51,8 @@ export interface WeeklySummaryData {
   highlights: SummaryItem[];
   lowlights: SummaryItem[];
   blockers: SummaryItem[];
-  todos: SummaryItem[];
+  todos: SummaryItem[];          // incomplete todos
+  completedTodos: SummaryItem[]; // completed this week
   meetings: MeetingSummaryItem[];
   decisions: SummaryItem[];
   nextWeekPreview: string[];

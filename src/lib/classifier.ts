@@ -62,6 +62,7 @@ export function classifyPrompt(prompt: string): EntryType {
     highlight: 0,
     lowlight: 0,
     blocker: 0,
+    todo: 0,
   };
 
   for (const rule of RULES) {

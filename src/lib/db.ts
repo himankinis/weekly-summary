@@ -35,6 +35,8 @@ export function getDb(): Database.Database {
   migrateSourceConstraint(_db);
   // Migrate existing DBs to add completed state for todos
   migrateCompletedColumn(_db);
+  // Migrate existing DBs to add carried_from_id for todo carry-forward
+  migrateCarriedFromId(_db);
 
   return _db;
 }
@@ -117,6 +119,16 @@ function migrateCompletedColumn(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_log_entries_type        ON log_entries (type);
     CREATE INDEX IF NOT EXISTS idx_log_entries_source      ON log_entries (source);
   `);
+}
+
+/** Adds carried_from_id column to log_entries for todo carry-forward tracking */
+function migrateCarriedFromId(db: Database.Database): void {
+  const row = db
+    .prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='log_entries'")
+    .get() as { sql: string } | undefined;
+  if (!row || row.sql.includes("carried_from_id")) return;
+
+  db.exec(`ALTER TABLE log_entries ADD COLUMN carried_from_id INTEGER REFERENCES log_entries(id) ON DELETE SET NULL`);
 }
 
 // ─── Settings ─────────────────────────────────────────────────────────────────

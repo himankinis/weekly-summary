@@ -176,6 +176,8 @@ function buildPPMText(s: WeeklySummaryData): string {
       lines.push(`| ${h} | ${b} |`);
     }
   }
+  const todoText = buildTodoProgressText(s);
+  if (todoText) { lines.push(""); lines.push(todoText); }
   return lines.join("\n");
 }
 
@@ -230,6 +232,11 @@ function PPMView({ summary }: { summary: WeeklySummaryData }) {
           </tbody>
         </table>
       </div>
+      {((summary.todos?.length ?? 0) + (summary.completedTodos?.length ?? 0)) > 0 && (
+        <div className="rounded-md border border-border bg-background p-3">
+          <TodoProgressSection summary={summary} />
+        </div>
+      )}
     </div>
   );
 }
@@ -393,6 +400,9 @@ function buildStakeholdersText(s: WeeklySummaryData): string {
     lines.push("No activity logged this week.");
   }
 
+  const todoText = buildTodoProgressText(s);
+  if (todoText) { lines.push(""); lines.push(todoText); }
+
   return lines.join("\n");
 }
 
@@ -442,6 +452,11 @@ function StakeholdersView({ summary: s }: { summary: WeeklySummaryData }) {
           })}
         </ul>
       )}
+      {((s.todos?.length ?? 0) + (s.completedTodos?.length ?? 0)) > 0 && (
+        <div className="mt-2">
+          <TodoProgressSection summary={s} />
+        </div>
+      )}
     </div>
   );
 }
@@ -487,6 +502,9 @@ function buildManagerText(s: WeeklySummaryData): string {
     if (carryOver) lines.push(`· ${carryOver}`);
   }
 
+  const todoText = buildTodoProgressText(s);
+  if (todoText) { lines.push(""); lines.push(todoText); }
+
   return lines.join("\n");
 }
 
@@ -518,6 +536,10 @@ function ManagerView({ summary: s }: { summary: WeeklySummaryData }) {
           </ul>
         </div>
       )}
+
+        {((s.todos?.length ?? 0) + (s.completedTodos?.length ?? 0)) > 0 && (
+          <TodoProgressSection summary={s} />
+        )}
 
       {s.blockers.length > 0 && (
         <div>
@@ -591,6 +613,8 @@ function buildSelfText(s: WeeklySummaryData): string {
     s.highlights.forEach((h) => lines.push(`• ${h.content}${h.source !== "manual" ? ` (${h.source})` : ""}`));
     lines.push("");
   }
+  const todoText = buildTodoProgressText(s);
+  if (todoText) { lines.push(todoText); lines.push(""); }
   if (s.lowlights.length > 0) {
     lines.push("⚠️ Lowlights");
     s.lowlights.forEach((l) => lines.push(`• ${l.content}`));
@@ -630,6 +654,9 @@ function SelfView({ summary: s }: { summary: WeeklySummaryData }) {
           text: h.content,
           badge: h.source !== "manual" ? h.source : undefined,
         }))} />
+      )}
+      {((s.todos?.length ?? 0) + (s.completedTodos?.length ?? 0)) > 0 && (
+        <TodoProgressSection summary={s} />
       )}
       {s.lowlights.length > 0 && (
         <SummarySection title="⚠️ Lowlights" items={s.lowlights.map((l) => ({ text: l.content }))} />
@@ -697,6 +724,57 @@ function SourcesLine({ stats, highlights, lowlights, blockers }: {
       {items.map((item, i) => <li key={i}>· {item}</li>)}
     </ul>
   );
+}
+
+// ─── To-Do Progress ───────────────────────────────────────────────────────────
+
+function TodoProgressSection({ summary: s }: { summary: WeeklySummaryData }) {
+  const incomplete = s.todos ?? [];
+  const completed = s.completedTodos ?? [];
+  const total = incomplete.length + completed.length;
+  if (total === 0) return null;
+
+  return (
+    <div className="text-sm space-y-1.5">
+      <h4 className="font-semibold flex items-center gap-1.5">
+        📝 To-Do Progress
+        <span className="text-xs font-normal text-muted-foreground">
+          {completed.length}/{total} completed
+        </span>
+      </h4>
+      {completed.length > 0 && (
+        <ul className="space-y-1">
+          {completed.map((t, i) => (
+            <li key={i} className="flex items-start gap-2">
+              <span className="text-green-500 mt-0.5 shrink-0">✓</span>
+              <span className="line-through text-muted-foreground">{t.content}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {incomplete.length > 0 && (
+        <ul className="space-y-1">
+          {incomplete.map((t, i) => (
+            <li key={i} className="flex items-start gap-2">
+              <span className="text-amber-500 mt-0.5 shrink-0">→</span>
+              <span className="text-muted-foreground">{t.content}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function buildTodoProgressText(s: WeeklySummaryData): string {
+  const incomplete = s.todos ?? [];
+  const completed = s.completedTodos ?? [];
+  const total = incomplete.length + completed.length;
+  if (total === 0) return "";
+  const lines: string[] = [`📝 To-Do Progress: ${completed.length}/${total} completed`];
+  completed.forEach((t) => lines.push(`  ✓ ${t.content}`));
+  incomplete.forEach((t) => lines.push(`  → ${t.content} (carrying over)`));
+  return lines.join("\n");
 }
 
 // ─── SummarySection ───────────────────────────────────────────────────────────

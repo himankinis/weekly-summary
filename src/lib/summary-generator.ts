@@ -257,18 +257,24 @@ function synthesizeConfluence(entries: LogEntry[]): SummaryItem[] {
     });
 }
 
-function synthesizeTodos(entries: LogEntry[]): SummaryItem[] {
+function synthesizeTodos(entries: LogEntry[]): { incomplete: SummaryItem[]; completed: SummaryItem[] } {
+  const incomplete: SummaryItem[] = [];
+  const completed: SummaryItem[] = [];
   const seen = new Set<number>();
-  return entries
-    .filter((e) => {
-      if ((e.type === "todo" || TODO_PATTERN.test(e.content)) && !e.completed) {
-        if (seen.has(e.id)) return false;
-        seen.add(e.id);
-        return true;
+
+  for (const e of entries) {
+    if ((e.type === "todo" || TODO_PATTERN.test(e.content)) && !seen.has(e.id)) {
+      seen.add(e.id);
+      const item: SummaryItem = { content: e.content.trim(), source: e.source, date: e.entry_date };
+      if (e.completed) {
+        completed.push(item);
+      } else {
+        incomplete.push(item);
       }
-      return false;
-    })
-    .map((e) => ({ content: e.content.trim(), source: e.source, date: e.entry_date }));
+    }
+  }
+
+  return { incomplete, completed };
 }
 
 // ─── Calendar Filtering ───────────────────────────────────────────────────────
@@ -344,7 +350,7 @@ export function generateWeeklySummary(weekStart?: string): WeeklySummaryData {
   const confluenceItems = synthesizeConfluence(entries);
   const jira = synthesizeJira(entries);
   const emailHighlights = synthesizeEmails(entries);
-  const todos = synthesizeTodos(entries);
+  const { incomplete: todos, completed: completedTodos } = synthesizeTodos(entries);
 
   // ── Merge with priority order and enforce limits ───────────────────────────
   // manual > confluence > jira > email; max 5 highlights, 3 blockers
@@ -372,7 +378,7 @@ export function generateWeeklySummary(weekStart?: string): WeeklySummaryData {
   const decisions: SummaryItem[] = buildDecisions(calEvents, manualEntries);
 
   // ── Next week preview ─────────────────────────────────────────────────────
-  const nextWeekPreview = buildNextWeekPreview(nextCalEvents, blockers, lowlights);
+  const nextWeekPreview = buildNextWeekPreview(nextCalEvents, blockers, lowlights, todos);
 
   // ── Stats ─────────────────────────────────────────────────────────────────
   const activeDays = new Set([
@@ -399,6 +405,7 @@ export function generateWeeklySummary(weekStart?: string): WeeklySummaryData {
     weekEnd,
     highlights,
     todos,
+    completedTodos,
     lowlights,
     blockers,
     meetings,
@@ -455,7 +462,8 @@ function buildDecisions(calEvents: CalendarEvent[], entries: LogEntry[]): Summar
 function buildNextWeekPreview(
   nextCalEvents: CalendarEvent[],
   blockers: SummaryItem[],
-  lowlights: SummaryItem[]
+  lowlights: SummaryItem[],
+  incompleteTodos: SummaryItem[] = []
 ): string[] {
   const preview: string[] = [];
 
@@ -471,6 +479,12 @@ function buildNextWeekPreview(
   if (inProgress > 0) {
     preview.push(
       `🔄 ${inProgress} item${inProgress > 1 ? "s" : ""} carrying over from this week`
+    );
+  }
+
+  if (incompleteTodos.length > 0) {
+    preview.push(
+      `📝 ${incompleteTodos.length} to-do${incompleteTodos.length > 1 ? "s" : ""} carrying over`
     );
   }
 
@@ -582,13 +596,23 @@ export function summaryToMarkdown(summary: WeeklySummaryData): string {
     lines.push("");
   }
 
-  if (summary.todos && summary.todos.length > 0) {
-    lines.push("## 📝 To-dos");
-    for (const t of summary.todos) {
-      const badge = t.source !== "manual" ? ` *(${t.source})*` : "";
-      lines.push(`- ${t.content}${badge}`);
-    }
+  const hasAnyTodos = (summary.todos?.length ?? 0) + (summary.completedTodos?.length ?? 0) > 0;
+  if (hasAnyTodos) {
+    lines.push("## 📝 To-Do Progress");
+    const total = (summary.todos?.length ?? 0) + (summary.completedTodos?.length ?? 0);
+    const completedCount = summary.completedTodos?.length ?? 0;
+    lines.push(`> ${completedCount}/${total} completed`);
     lines.push("");
+    if (summary.completedTodos && summary.completedTodos.length > 0) {
+      lines.push("**Completed:**");
+      for (const t of summary.completedTodos) lines.push(`- ~~${t.content}~~`);
+      lines.push("");
+    }
+    if (summary.todos && summary.todos.length > 0) {
+      lines.push("**Carrying over:**");
+      for (const t of summary.todos) lines.push(`- ${t.content}`);
+      lines.push("");
+    }
   }
 
   if (summary.lowlights.length > 0) {
@@ -653,12 +677,19 @@ export function summaryToText(summary: WeeklySummaryData): string {
     lines.push("");
   }
 
-  if (summary.todos && summary.todos.length > 0) {
-    lines.push("TODOS");
+  const hasAnyTodosText = (summary.todos?.length ?? 0) + (summary.completedTodos?.length ?? 0) > 0;
+  if (hasAnyTodosText) {
+    const total = (summary.todos?.length ?? 0) + (summary.completedTodos?.length ?? 0);
+    const completedCount = summary.completedTodos?.length ?? 0;
+    lines.push(`TO-DO PROGRESS (${completedCount}/${total} completed)`);
     lines.push("-".repeat(30));
-    for (const t of summary.todos) {
-      const badge = t.source !== "manual" ? ` (${t.source})` : "";
-      lines.push(`  - ${t.content}${badge}`);
+    if (summary.completedTodos && summary.completedTodos.length > 0) {
+      lines.push("  Completed:");
+      for (const t of summary.completedTodos) lines.push(`    ✓ ${t.content}`);
+    }
+    if (summary.todos && summary.todos.length > 0) {
+      lines.push("  Carrying over:");
+      for (const t of summary.todos) lines.push(`    → ${t.content}`);
     }
     lines.push("");
   }
