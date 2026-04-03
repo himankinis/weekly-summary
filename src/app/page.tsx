@@ -171,7 +171,7 @@ export default function Dashboard() {
 
           {/* Right column */}
           <div className="lg:col-span-2 space-y-5">
-            <SummaryPanel key={`${weekStart}-${summaryKey}`} weekStart={weekStart} entries={entries} />
+            <SummaryPanel key={`${weekStart}-${summaryKey}`} weekStart={weekStart} />
             <AtlassianPanel onSynced={() => fetchEntries(weekStart)} />
             <EmailPanel onSynced={() => fetchEntries(weekStart)} />
             <TeamsPanel onSynced={() => fetchEntries(weekStart)} />

@@ -489,16 +489,17 @@ export function generateWeeklySummary(weekStart?: string): WeeklySummaryData {
     .filter((e) => e.source === "hook" && e.type === "blocker")
     .map((e) => ({ content: e.content, source: "hook" as const, date: e.entry_date }));
 
-  // ── Merge with priority order and enforce limits ───────────────────────────
-  // manual > confluence > jira > email > teams > hook; max 5 highlights, 3 blockers
+  // ── Merge with priority order ──────────────────────────────────────────────
+  // Completed todos → highlights (accomplishments); incomplete todos → blockers (pending)
   const highlights: SummaryItem[] = [
     ...manualHighlights,
+    ...completedTodos,   // completed to-dos surface as accomplishments
     ...confluenceItems,
     ...jira.highlights,
     ...emailHighlights,
     ...teams.highlights,
     ...hookHighlights,
-  ].slice(0, 5);
+  ].slice(0, 8);
 
   const lowlights: SummaryItem[] = [
     ...manualLowlights,
@@ -509,10 +510,11 @@ export function generateWeeklySummary(weekStart?: string): WeeklySummaryData {
 
   const blockers: SummaryItem[] = [
     ...manualBlockers,
+    ...todos,            // incomplete to-dos surface as pending blockers
     ...jira.blockers,
     ...teams.blockers,
     ...hookBlockers,
-  ].slice(0, 3);
+  ].slice(0, 5);
 
   // ── Calendar: filter noise, keep notable meetings ─────────────────────────
   const meetings: MeetingSummaryItem[] = filterAndFormatCalendar(calEvents);

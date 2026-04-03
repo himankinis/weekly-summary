@@ -8,27 +8,15 @@ import {
   Loader2, Copy, Download, CheckCheck, Sparkles, RefreshCw,
 } from "lucide-react";
 import { format, parseISO, addDays } from "date-fns";
-import type { WeeklySummaryData, SummaryItem, LogEntry } from "@/lib/types";
+import type { WeeklySummaryData, SummaryItem } from "@/lib/types";
 
 type Audience = "ppm" | "self" | "manager" | "stakeholders";
 
 interface Props {
   weekStart: string;
-  entries: LogEntry[];
 }
 
-/** Derive live todo state from the current entries array (always up-to-date). */
-function liveTodosFromEntries(entries: LogEntry[]): Pick<WeeklySummaryData, "todos" | "completedTodos"> {
-  const todos: SummaryItem[] = entries
-    .filter((e) => e.type === "todo" && !e.completed)
-    .map((e) => ({ content: e.content, source: e.source, date: e.entry_date }));
-  const completedTodos: SummaryItem[] = entries
-    .filter((e) => e.type === "todo" && Boolean(e.completed))
-    .map((e) => ({ content: e.content, source: e.source, date: e.entry_date }));
-  return { todos, completedTodos };
-}
-
-export default function SummaryPanel({ weekStart, entries }: Props) {
+export default function SummaryPanel({ weekStart }: Props) {
   const [summary, setSummary] = useState<WeeklySummaryData | null>(null);
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -59,16 +47,13 @@ export default function SummaryPanel({ weekStart, entries }: Props) {
     }
   };
 
-  // Always use live todo state from the current entries (avoids stale cached summary todos)
-  const displaySummary = summary ? { ...summary, ...liveTodosFromEntries(entries) } : null;
-
   const copyToClipboard = async () => {
-    if (!displaySummary) return;
+    if (!summary) return;
     let text = "";
-    if (audience === "ppm")          text = buildPPMText(displaySummary);
-    else if (audience === "stakeholders") text = buildStakeholdersText(displaySummary);
-    else if (audience === "manager")  text = buildManagerText(displaySummary);
-    else                              text = buildSelfText(displaySummary);
+    if (audience === "ppm")               text = buildPPMText(summary);
+    else if (audience === "stakeholders") text = buildStakeholdersText(summary);
+    else if (audience === "manager")      text = buildManagerText(summary);
+    else                                  text = buildSelfText(summary);
     await navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -87,7 +72,7 @@ export default function SummaryPanel({ weekStart, entries }: Props) {
             Weekly Summary
           </CardTitle>
           <div className="flex items-center gap-2">
-            {displaySummary && (
+            {summary && (
               <>
                 <Select
                   value={audience}
@@ -117,7 +102,7 @@ export default function SummaryPanel({ weekStart, entries }: Props) {
       </CardHeader>
 
       <CardContent>
-        {!displaySummary && !loading && (
+        {!summary && !loading && (
           <div className="text-center py-8">
             <p className="text-sm text-muted-foreground mb-4">
               Generate a structured summary of your week's work.
@@ -140,10 +125,10 @@ export default function SummaryPanel({ weekStart, entries }: Props) {
           <div className="rounded-md bg-destructive/10 text-destructive px-4 py-3 text-sm">{error}</div>
         )}
 
-        {displaySummary && !loading && audience === "ppm" && <PPMView summary={displaySummary} />}
-        {displaySummary && !loading && audience === "stakeholders" && <StakeholdersView summary={displaySummary} />}
-        {displaySummary && !loading && audience === "manager" && <ManagerView summary={displaySummary} />}
-        {displaySummary && !loading && audience === "self" && <SelfView summary={displaySummary} />}
+        {summary && !loading && audience === "ppm" && <PPMView summary={summary} />}
+        {summary && !loading && audience === "stakeholders" && <StakeholdersView summary={summary} />}
+        {summary && !loading && audience === "manager" && <ManagerView summary={summary} />}
+        {summary && !loading && audience === "self" && <SelfView summary={summary} />}
       </CardContent>
     </Card>
   );
@@ -193,8 +178,6 @@ function buildPPMText(s: WeeklySummaryData): string {
       lines.push(`| ${h} | ${b} |`);
     }
   }
-  const todoText = buildTodoProgressText(s);
-  if (todoText) { lines.push(""); lines.push(todoText); }
   return lines.join("\n");
 }
 
@@ -249,11 +232,6 @@ function PPMView({ summary }: { summary: WeeklySummaryData }) {
           </tbody>
         </table>
       </div>
-      {((summary.todos?.length ?? 0) + (summary.completedTodos?.length ?? 0)) > 0 && (
-        <div className="rounded-md border border-border bg-background p-3">
-          <TodoProgressSection summary={summary} />
-        </div>
-      )}
     </div>
   );
 }
@@ -417,9 +395,6 @@ function buildStakeholdersText(s: WeeklySummaryData): string {
     lines.push("No activity logged this week.");
   }
 
-  const todoText = buildTodoProgressText(s);
-  if (todoText) { lines.push(""); lines.push(todoText); }
-
   return lines.join("\n");
 }
 
@@ -469,11 +444,6 @@ function StakeholdersView({ summary: s }: { summary: WeeklySummaryData }) {
           })}
         </ul>
       )}
-      {((s.todos?.length ?? 0) + (s.completedTodos?.length ?? 0)) > 0 && (
-        <div className="mt-2">
-          <TodoProgressSection summary={s} />
-        </div>
-      )}
     </div>
   );
 }
@@ -501,9 +471,6 @@ function buildManagerText(s: WeeklySummaryData): string {
     s.blockers.slice(0, 3).forEach((b) => lines.push(`· ${frameBlocker(b)}`));
     lines.push("");
   }
-
-  const todoText = buildTodoProgressText(s);
-  if (todoText) { lines.push(todoText); lines.push(""); }
 
   if (s.decisions.length > 0) {
     lines.push("### Key Decisions");
@@ -566,10 +533,6 @@ function ManagerView({ summary: s }: { summary: WeeklySummaryData }) {
             ))}
           </ul>
         </div>
-      )}
-
-      {((s.todos?.length ?? 0) + (s.completedTodos?.length ?? 0)) > 0 && (
-        <TodoProgressSection summary={s} />
       )}
 
       {s.decisions.length > 0 && (
@@ -640,8 +603,6 @@ function buildSelfText(s: WeeklySummaryData): string {
     s.blockers.forEach((b) => lines.push(`• ${b.content}`));
     lines.push("");
   }
-  const todoText = buildTodoProgressText(s);
-  if (todoText) { lines.push(todoText); lines.push(""); }
   if (s.decisions.length > 0) {
     lines.push("🎯 Key Decisions");
     s.decisions.forEach((d) => lines.push(`• ${d.content}`));
@@ -677,9 +638,6 @@ function SelfView({ summary: s }: { summary: WeeklySummaryData }) {
       )}
       {s.blockers.length > 0 && (
         <SummarySection title="🚫 Blockers" items={s.blockers.map((b) => ({ text: b.content }))} />
-      )}
-      {((s.todos?.length ?? 0) + (s.completedTodos?.length ?? 0)) > 0 && (
-        <TodoProgressSection summary={s} />
       )}
       {s.decisions.length > 0 && (
         <SummarySection title="🎯 Key Decisions" items={s.decisions.map((d) => ({ text: d.content }))} />
@@ -745,57 +703,6 @@ function SourcesLine({ stats, highlights, lowlights, blockers }: {
       {items.map((item, i) => <li key={i}>· {item}</li>)}
     </ul>
   );
-}
-
-// ─── To-Do Progress ───────────────────────────────────────────────────────────
-
-function TodoProgressSection({ summary: s }: { summary: WeeklySummaryData }) {
-  const incomplete = s.todos ?? [];
-  const completed = s.completedTodos ?? [];
-  const total = incomplete.length + completed.length;
-  if (total === 0) return null;
-
-  return (
-    <div className="text-sm space-y-1.5">
-      <h4 className="font-semibold flex items-center gap-1.5">
-        📝 To-Do Progress
-        <span className="text-xs font-normal text-muted-foreground">
-          {completed.length}/{total} completed
-        </span>
-      </h4>
-      {completed.length > 0 && (
-        <ul className="space-y-1">
-          {completed.map((t, i) => (
-            <li key={i} className="flex items-start gap-2">
-              <span className="text-green-500 mt-0.5 shrink-0">✓</span>
-              <span className="line-through text-muted-foreground">{t.content}</span>
-            </li>
-          ))}
-        </ul>
-      )}
-      {incomplete.length > 0 && (
-        <ul className="space-y-1">
-          {incomplete.map((t, i) => (
-            <li key={i} className="flex items-start gap-2">
-              <span className="text-amber-500 mt-0.5 shrink-0">→</span>
-              <span className="text-muted-foreground">{t.content}</span>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  );
-}
-
-function buildTodoProgressText(s: WeeklySummaryData): string {
-  const incomplete = s.todos ?? [];
-  const completed = s.completedTodos ?? [];
-  const total = incomplete.length + completed.length;
-  if (total === 0) return "";
-  const lines: string[] = [`📝 To-Do Progress: ${completed.length}/${total} completed`];
-  completed.forEach((t) => lines.push(`  ✓ ${t.content}`));
-  incomplete.forEach((t) => lines.push(`  → ${t.content} (carrying over)`));
-  return lines.join("\n");
 }
 
 // ─── SummarySection ───────────────────────────────────────────────────────────
