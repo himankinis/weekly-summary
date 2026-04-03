@@ -12,19 +12,20 @@
   },
   "dependencies": {
     "better-sqlite3": "^12.8.0",
-    "node-ical": "^0.16.1",
+    "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "date-fns": "^3.6.0",
     "lucide-react": "^0.462.0",
     "next": "15.1.0",
+    "node-ical": "^0.16.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "tailwind-merge": "^2.5.4",
-    "class-variance-authority": "^0.7.1"
+    "recharts": "^3.8.1",
+    "tailwind-merge": "^2.5.4"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.11",
-"@types/node": "^20",
+    "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^8",

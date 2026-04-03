@@ -8,11 +8,13 @@ import SummaryPanel from "@/components/SummaryPanel";
 import CalendarPanel from "@/components/CalendarPanel";
 import AtlassianPanel from "@/components/AtlassianPanel";
 import EmailPanel from "@/components/EmailPanel";
+import TeamsPanel from "@/components/TeamsPanel";
 import TodosPanel from "@/components/TodosPanel";
 import WeekNav from "@/components/WeekNav";
 import PastSummariesPanel from "@/components/PastSummariesPanel";
 import { format, subDays, parseISO } from "date-fns";
-import { Activity, Zap } from "lucide-react";
+import { Activity, Zap, TrendingUp } from "lucide-react";
+import Link from "next/link";
 import type { LogEntry } from "@/lib/types";
 
 function getThisWeekStart(): string {
@@ -97,6 +99,13 @@ export default function Dashboard() {
           <div className="flex items-center gap-2.5">
             <Activity className="h-5 w-5 text-primary" />
             <span className="font-semibold tracking-tight">Weekly Summary</span>
+            <Link
+              href="/trends"
+              className="ml-2 flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <TrendingUp className="h-3.5 w-3.5" />
+              Trends
+            </Link>
           </div>
           <WeekNav weekStart={weekStart} onWeekChange={setWeekStart} />
         </div>
@@ -165,6 +174,7 @@ export default function Dashboard() {
             <SummaryPanel key={`${weekStart}-${summaryKey}`} weekStart={weekStart} />
             <AtlassianPanel onSynced={() => fetchEntries(weekStart)} />
             <EmailPanel onSynced={() => fetchEntries(weekStart)} />
+            <TeamsPanel onSynced={() => fetchEntries(weekStart)} />
             <CalendarPanel weekStart={weekStart} />
             <PastSummariesPanel />
           </div>

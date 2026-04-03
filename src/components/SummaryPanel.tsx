@@ -138,8 +138,8 @@ export default function SummaryPanel({ weekStart }: Props) {
 
 function ppmHighlights(s: WeeklySummaryData): SummaryItem[] {
   // Generator already synthesizes all sources into PM-quality content.
-  // Priority: manual > confluence > jira > email (hooks excluded).
-  const order = ["manual", "confluence", "jira", "email"];
+  // Priority: manual > confluence > jira > email > teams (hooks excluded).
+  const order = ["manual", "confluence", "jira", "email", "teams", "hook"];
   return s.highlights
     .filter((h) => order.includes(h.source))
     .sort((a, b) => order.indexOf(a.source) - order.indexOf(b.source))
@@ -147,7 +147,9 @@ function ppmHighlights(s: WeeklySummaryData): SummaryItem[] {
 }
 
 function ppmBlockers(s: WeeklySummaryData): SummaryItem[] {
-  return s.blockers.filter((b) => b.source === "manual" || b.source === "jira").slice(0, 3);
+  return s.blockers.filter((b) =>
+    ["manual", "jira", "teams", "hook"].includes(b.source)
+  ).slice(0, 3);
 }
 
 function buildPPMText(s: WeeklySummaryData): string {
@@ -485,6 +487,9 @@ function buildManagerText(s: WeeklySummaryData): string {
     lines.push("");
   }
 
+  const todoText = buildTodoProgressText(s);
+  if (todoText) { lines.push(todoText); lines.push(""); }
+
   if (s.decisions.length > 0) {
     lines.push("### Key Decisions");
     s.decisions.slice(0, 3).forEach((d) => lines.push(`· ${d.content}`));
@@ -501,9 +506,6 @@ function buildManagerText(s: WeeklySummaryData): string {
     nextMeetings.forEach((m) => lines.push(`· ${m}`));
     if (carryOver) lines.push(`· ${carryOver}`);
   }
-
-  const todoText = buildTodoProgressText(s);
-  if (todoText) { lines.push(""); lines.push(todoText); }
 
   return lines.join("\n");
 }
@@ -537,10 +539,6 @@ function ManagerView({ summary: s }: { summary: WeeklySummaryData }) {
         </div>
       )}
 
-        {((s.todos?.length ?? 0) + (s.completedTodos?.length ?? 0)) > 0 && (
-          <TodoProgressSection summary={s} />
-        )}
-
       {s.blockers.length > 0 && (
         <div>
           <h4 className="font-semibold mb-1.5">Blockers</h4>
@@ -553,6 +551,10 @@ function ManagerView({ summary: s }: { summary: WeeklySummaryData }) {
             ))}
           </ul>
         </div>
+      )}
+
+      {((s.todos?.length ?? 0) + (s.completedTodos?.length ?? 0)) > 0 && (
+        <TodoProgressSection summary={s} />
       )}
 
       {s.decisions.length > 0 && (
@@ -613,8 +615,6 @@ function buildSelfText(s: WeeklySummaryData): string {
     s.highlights.forEach((h) => lines.push(`• ${h.content}${h.source !== "manual" ? ` (${h.source})` : ""}`));
     lines.push("");
   }
-  const todoText = buildTodoProgressText(s);
-  if (todoText) { lines.push(todoText); lines.push(""); }
   if (s.lowlights.length > 0) {
     lines.push("⚠️ Lowlights");
     s.lowlights.forEach((l) => lines.push(`• ${l.content}`));
@@ -625,6 +625,8 @@ function buildSelfText(s: WeeklySummaryData): string {
     s.blockers.forEach((b) => lines.push(`• ${b.content}`));
     lines.push("");
   }
+  const todoText = buildTodoProgressText(s);
+  if (todoText) { lines.push(todoText); lines.push(""); }
   if (s.decisions.length > 0) {
     lines.push("🎯 Key Decisions");
     s.decisions.forEach((d) => lines.push(`• ${d.content}`));
@@ -655,14 +657,14 @@ function SelfView({ summary: s }: { summary: WeeklySummaryData }) {
           badge: h.source !== "manual" ? h.source : undefined,
         }))} />
       )}
-      {((s.todos?.length ?? 0) + (s.completedTodos?.length ?? 0)) > 0 && (
-        <TodoProgressSection summary={s} />
-      )}
       {s.lowlights.length > 0 && (
         <SummarySection title="⚠️ Lowlights" items={s.lowlights.map((l) => ({ text: l.content }))} />
       )}
       {s.blockers.length > 0 && (
         <SummarySection title="🚫 Blockers" items={s.blockers.map((b) => ({ text: b.content }))} />
+      )}
+      {((s.todos?.length ?? 0) + (s.completedTodos?.length ?? 0)) > 0 && (
+        <TodoProgressSection summary={s} />
       )}
       {s.decisions.length > 0 && (
         <SummarySection title="🎯 Key Decisions" items={s.decisions.map((d) => ({ text: d.content }))} />
@@ -689,9 +691,11 @@ function quantLine(s: WeeklySummaryData): string {
     `${s.stats.blocker_count} blocker${s.stats.blocker_count !== 1 ? "s" : ""}`,
   ].join(" · ");
   const extras: string[] = [];
-  if (s.stats.meeting_count > 0) extras.push(`${s.stats.meeting_count} meetings`);
+  if (s.stats.meeting_count > 0)  extras.push(`${s.stats.meeting_count} meetings`);
   if (s.stats.jira_count > 0)    extras.push(`${s.stats.jira_count} Jira tickets`);
   if (s.stats.email_count > 0)   extras.push(`${s.stats.email_count} emails`);
+  if ((s.stats.teams_count ?? 0) > 0) extras.push(`${s.stats.teams_count} Teams messages`);
+  if ((s.stats.hook_count ?? 0) > 0) extras.push(`${s.stats.hook_count} Claude captures`);
   return `This week: ${parts}${extras.length > 0 ? " | " + extras.join(" | ") : ""}`;
 }
 
@@ -715,10 +719,12 @@ function SourcesLine({ stats, highlights, lowlights, blockers }: {
 }) {
   const manualCount = [...highlights, ...lowlights, ...blockers].filter((e) => e.source === "manual").length;
   const items: string[] = [];
-  if (stats.jira_count > 0)    items.push(`Jira: ${stats.jira_count} ticket${stats.jira_count > 1 ? "s" : ""} updated`);
-  if (stats.meeting_count > 0) items.push(`Calendar: ${stats.meeting_count} meetings`);
-  if (stats.email_count > 0)   items.push(`Outlook: ${stats.email_count} emails`);
-  if (manualCount > 0)         items.push(`Manual: ${manualCount} entries`);
+  if (stats.jira_count > 0)         items.push(`Jira: ${stats.jira_count} ticket${stats.jira_count > 1 ? "s" : ""} updated`);
+  if (stats.meeting_count > 0)      items.push(`Calendar: ${stats.meeting_count} meetings`);
+  if (stats.email_count > 0)        items.push(`Outlook: ${stats.email_count} emails`);
+  if ((stats.teams_count ?? 0) > 0) items.push(`Teams: ${stats.teams_count} messages`);
+  if ((stats.hook_count ?? 0) > 0)  items.push(`Claude: ${stats.hook_count} auto-captured`);
+  if (manualCount > 0)              items.push(`Manual: ${manualCount} entries`);
   return (
     <ul className="space-y-0.5 text-xs text-muted-foreground">
       {items.map((item, i) => <li key={i}>· {item}</li>)}

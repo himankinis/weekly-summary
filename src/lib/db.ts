@@ -37,6 +37,8 @@ export function getDb(): Database.Database {
   migrateCompletedColumn(_db);
   // Migrate existing DBs to add carried_from_id for todo carry-forward
   migrateCarriedFromId(_db);
+  // Migrate existing DBs to support teams source
+  migrateTeamsSource(_db);
 
   return _db;
 }
@@ -129,6 +131,43 @@ function migrateCarriedFromId(db: Database.Database): void {
   if (!row || row.sql.includes("carried_from_id")) return;
 
   db.exec(`ALTER TABLE log_entries ADD COLUMN carried_from_id INTEGER REFERENCES log_entries(id) ON DELETE SET NULL`);
+}
+
+/** Adds 'teams' to the source CHECK constraint */
+function migrateTeamsSource(db: Database.Database): void {
+  const row = db
+    .prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='log_entries'")
+    .get() as { sql: string } | undefined;
+
+  if (!row || row.sql.includes("'teams'")) return; // already up to date
+
+  db.exec(`
+    ALTER TABLE log_entries RENAME TO _log_entries_v4;
+
+    CREATE TABLE log_entries (
+      id              INTEGER PRIMARY KEY AUTOINCREMENT,
+      content         TEXT    NOT NULL,
+      type            TEXT    NOT NULL CHECK (type IN ('highlight', 'lowlight', 'blocker', 'todo')),
+      source          TEXT    NOT NULL DEFAULT 'manual' CHECK (source IN ('manual', 'hook', 'calendar', 'jira', 'confluence', 'email', 'teams')),
+      raw_prompt      TEXT,
+      calendar_uid    TEXT,
+      entry_date      TEXT    NOT NULL,
+      week_start      TEXT    NOT NULL,
+      completed       INTEGER NOT NULL DEFAULT 0,
+      completed_at    TEXT,
+      carried_from_id INTEGER REFERENCES log_entries(id) ON DELETE SET NULL,
+      created_at      TEXT    NOT NULL DEFAULT (datetime('now')),
+      updated_at      TEXT    NOT NULL DEFAULT (datetime('now'))
+    );
+
+    INSERT INTO log_entries SELECT * FROM _log_entries_v4;
+    DROP TABLE _log_entries_v4;
+
+    CREATE INDEX IF NOT EXISTS idx_log_entries_week_start  ON log_entries (week_start);
+    CREATE INDEX IF NOT EXISTS idx_log_entries_entry_date  ON log_entries (entry_date);
+    CREATE INDEX IF NOT EXISTS idx_log_entries_type        ON log_entries (type);
+    CREATE INDEX IF NOT EXISTS idx_log_entries_source      ON log_entries (source);
+  `);
 }
 
 // ─── Settings ─────────────────────────────────────────────────────────────────

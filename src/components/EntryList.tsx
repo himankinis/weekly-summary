@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
   Trash2, Zap, User, Calendar, ChevronDown, ChevronRight,
-  SquareKanban, FileText, Mail, LayoutList, Layers,
+  SquareKanban, FileText, Mail, MessageSquare, LayoutList, Layers,
 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import type { EntryType, EntrySource, LogEntry } from "@/lib/types";
@@ -39,10 +39,11 @@ const SOURCE_CONFIG: Record<EntrySource, SourceConfig> = {
   hook:       { icon: <Zap          className="h-3 w-3" />, label: "Claude",     pill: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200" },
   manual:     { icon: <User         className="h-3 w-3" />, label: "Manual",     pill: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300"  },
   confluence: { icon: <FileText     className="h-3 w-3" />, label: "Confluence", pill: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300"  },
+  teams:      { icon: <MessageSquare className="h-3 w-3" />, label: "Teams",    pill: "bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-200"       },
 };
 
 // Source sections order for grouped view
-const SOURCE_ORDER: EntrySource[] = ["manual", "jira", "confluence", "email", "hook"];
+const SOURCE_ORDER: EntrySource[] = ["manual", "jira", "confluence", "email", "teams", "hook"];
 
 function SourcePill({ source }: { source: EntrySource }) {
   const cfg = SOURCE_CONFIG[source];

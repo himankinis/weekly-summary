@@ -140,12 +140,13 @@ function countAttendees(event: ical.VEvent): number {
 
 // ─── Date Extractor ───────────────────────────────────────────────────────────
 
-function extractDate(val: ical.DateType | undefined): Date | null {
+function extractDate(val: any): Date | null {
   if (!val) return null;
-  if (val instanceof Date) return val;
-  // node-ical sometimes returns { val: Date, ... } objects
-  if (typeof val === "object" && "toJSDate" in val && typeof (val as { toJSDate: () => Date }).toJSDate === "function") {
-    return (val as { toJSDate: () => Date }).toJSDate();
+  // runtime-safe Date detection (covers plain Date and date-like objects)
+  if (Object.prototype.toString.call(val) === "[object Date]") return (val as unknown) as Date;
+  // node-ical sometimes returns objects with a toJSDate() method
+  if (typeof val === "object" && val !== null && "toJSDate" in val && typeof (val as any).toJSDate === "function") {
+    return (val as any).toJSDate();
   }
   return null;
 }

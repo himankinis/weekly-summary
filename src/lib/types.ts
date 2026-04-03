@@ -1,7 +1,7 @@
 // ─── Entry Types ──────────────────────────────────────────────────────────────
 
 export type EntryType = "highlight" | "lowlight" | "blocker" | "todo";
-export type EntrySource = "manual" | "hook" | "calendar" | "jira" | "confluence" | "email";
+export type EntrySource = "manual" | "hook" | "calendar" | "jira" | "confluence" | "email" | "teams";
 
 export interface LogEntry {
   id: number;
@@ -83,6 +83,8 @@ export interface WeekStats {
   days_active: number;
   jira_count: number;
   email_count: number;
+  teams_count?: number;
+  hook_count?: number;
 }
 
 export interface WeeklySummary {

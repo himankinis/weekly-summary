@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS log_entries (
   id            INTEGER PRIMARY KEY AUTOINCREMENT,
   content       TEXT    NOT NULL,
   type          TEXT    NOT NULL CHECK (type IN ('highlight', 'lowlight', 'blocker', 'todo')),
-  source        TEXT    NOT NULL DEFAULT 'manual' CHECK (source IN ('manual', 'hook', 'calendar', 'jira', 'confluence', 'email')),
+  source        TEXT    NOT NULL DEFAULT 'manual' CHECK (source IN ('manual', 'hook', 'calendar', 'jira', 'confluence', 'email', 'teams')),
   -- For hook-captured entries: the raw prompt text
   raw_prompt    TEXT,
   -- For calendar entries: the event uid from ICS

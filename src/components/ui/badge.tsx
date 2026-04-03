@@ -22,6 +22,8 @@ const badgeVariants = cva(
           "border-transparent bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
         todo:
           "border-transparent bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
+        teams:
+          "border-transparent bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-200",
       },
     },
     defaultVariants: {

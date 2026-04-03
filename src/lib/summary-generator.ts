@@ -169,6 +169,131 @@ function synthesizeEmails(entries: LogEntry[]): SummaryItem[] {
   return groupEmailsByTopic(filtered).map(synthesizeEmailGroup);
 }
 
+// ─── Teams Synthesis ──────────────────────────────────────────────────────────
+
+interface ParsedTeams {
+  channel: string;
+  snippet: string;
+  entry: LogEntry;
+}
+
+const NOISE_TEAMS_PATTERNS = [
+  /\breacted to a message\b/i,
+  /\bjoined the (meeting|call)\b/i,
+  /\bleft the (meeting|call)\b/i,
+  /\bmentioned you\b/i,
+];
+
+function parseTeamsContent(entry: LogEntry): ParsedTeams {
+  // Stored as: 'Teams chat in CHANNEL: "SNIPPET"' or 'Teams chat: "SNIPPET"'
+  const m = entry.content.match(/^Teams chat(?:\s+in\s+(.+?))?:\s+"(.+?)"\.?$/);
+  if (m) return { channel: m[1] ?? "Teams", snippet: m[2], entry };
+  return { channel: "Teams", snippet: entry.content, entry };
+}
+
+function isNoisyTeams(parsed: ParsedTeams): boolean {
+  return NOISE_TEAMS_PATTERNS.some((p) => p.test(parsed.snippet));
+}
+
+/** Two snippets are about the same topic if they share ≥1 significant word (≥4 chars) */
+function teamTopicsSimilar(a: string, b: string): boolean {
+  const stop = new Set([
+    "the", "and", "for", "with", "this", "that", "from", "your", "just",
+    "will", "have", "been", "need", "also", "some", "about", "team",
+    "update", "please", "thanks", "question", "following",
+  ]);
+  const words = (s: string) =>
+    s.toLowerCase().split(/\W+/).filter((w) => w.length >= 4 && !stop.has(w));
+  const aSet = new Set(words(a));
+  return words(b).some((w) => aSet.has(w));
+}
+
+function groupTeamsByTopic(messages: ParsedTeams[]): ParsedTeams[][] {
+  const groups: ParsedTeams[][] = [];
+  const used = new Set<number>();
+  for (let i = 0; i < messages.length; i++) {
+    if (used.has(i)) continue;
+    const group: ParsedTeams[] = [messages[i]];
+    used.add(i);
+    for (let j = i + 1; j < messages.length; j++) {
+      if (used.has(j)) continue;
+      // Group only within the same channel and by topic similarity
+      if (
+        messages[i].channel === messages[j].channel &&
+        teamTopicsSimilar(messages[i].snippet, messages[j].snippet)
+      ) {
+        group.push(messages[j]);
+        used.add(j);
+      }
+    }
+    groups.push(group);
+  }
+  return groups;
+}
+
+function synthesizeTeamsGroup(group: ParsedTeams[]): { item: SummaryItem; type: EntryType } {
+  const { channel } = group[0];
+  const channelStr = channel !== "Teams" ? ` in ${channel}` : "";
+
+  // Longest snippet is most descriptive
+  const rep = group.reduce((a, b) =>
+    a.snippet.length > b.snippet.length ? a : b
+  );
+  const topic = rep.snippet.split(/[.!?;]/)[0].trim();
+  const topicShort = topic.length > 65 ? topic.slice(0, 62) + "…" : topic;
+
+  // Majority entry type drives the synthesized type
+  const scores: Record<string, number> = { highlight: 0, lowlight: 0, blocker: 0 };
+  for (const m of group) scores[m.entry.type] = (scores[m.entry.type] ?? 0) + 1;
+  const entryType = (
+    (Object.entries(scores).sort((a, b) => b[1] - a[1])[0][0]) as EntryType
+  );
+
+  let content: string;
+  const n = group.length;
+  if (n >= 3) {
+    content = `Drove discussion on "${topicShort}"${channelStr} (${n} messages)`;
+  } else if (n === 2) {
+    content = `Aligned on "${topicShort}"${channelStr}`;
+  } else if (entryType === "blocker") {
+    content = `Raised blocker${channelStr}: "${topicShort}"`;
+  } else if (entryType === "lowlight") {
+    content = `Flagged issue${channelStr}: "${topicShort}"`;
+  } else {
+    content = `Shared update${channelStr}: "${topicShort}"`;
+  }
+
+  const latest = group.reduce((a, b) =>
+    a.entry.entry_date > b.entry.entry_date ? a : b
+  ).entry;
+
+  return { item: { content, source: "teams" as const, date: latest.entry_date }, type: entryType };
+}
+
+function synthesizeTeams(entries: LogEntry[]): {
+  highlights: SummaryItem[];
+  lowlights: SummaryItem[];
+  blockers: SummaryItem[];
+} {
+  const highlights: SummaryItem[] = [];
+  const lowlights: SummaryItem[] = [];
+  const blockers: SummaryItem[] = [];
+
+  const parsed = entries
+    .filter((e) => e.source === "teams")
+    .map(parseTeamsContent)
+    .filter((m) => !isNoisyTeams(m));
+
+  for (const group of groupTeamsByTopic(parsed)) {
+    const { item, type } = synthesizeTeamsGroup(group);
+    if (type === "blocker") blockers.push(item);
+    else if (type === "lowlight") lowlights.push(item);
+    else highlights.push(item);
+  }
+
+  return { highlights, lowlights, blockers };
+}
+
 // ─── Jira Synthesis ───────────────────────────────────────────────────────────
 
 interface ParsedJira {
@@ -350,25 +475,43 @@ export function generateWeeklySummary(weekStart?: string): WeeklySummaryData {
   const confluenceItems = synthesizeConfluence(entries);
   const jira = synthesizeJira(entries);
   const emailHighlights = synthesizeEmails(entries);
+  const teams = synthesizeTeams(entries);
   const { incomplete: todos, completed: completedTodos } = synthesizeTodos(entries);
 
+  // ── Hook entries — include classified content in summary ───────────────────
+  const hookHighlights: SummaryItem[] = entries
+    .filter((e) => e.source === "hook" && e.type === "highlight")
+    .map((e) => ({ content: e.content, source: "hook" as const, date: e.entry_date }));
+  const hookLowlights: SummaryItem[] = entries
+    .filter((e) => e.source === "hook" && e.type === "lowlight")
+    .map((e) => ({ content: e.content, source: "hook" as const, date: e.entry_date }));
+  const hookBlockers: SummaryItem[] = entries
+    .filter((e) => e.source === "hook" && e.type === "blocker")
+    .map((e) => ({ content: e.content, source: "hook" as const, date: e.entry_date }));
+
   // ── Merge with priority order and enforce limits ───────────────────────────
-  // manual > confluence > jira > email; max 5 highlights, 3 blockers
+  // manual > confluence > jira > email > teams > hook; max 5 highlights, 3 blockers
   const highlights: SummaryItem[] = [
     ...manualHighlights,
     ...confluenceItems,
     ...jira.highlights,
     ...emailHighlights,
+    ...teams.highlights,
+    ...hookHighlights,
   ].slice(0, 5);
 
   const lowlights: SummaryItem[] = [
     ...manualLowlights,
     ...jira.lowlights,
+    ...teams.lowlights,
+    ...hookLowlights,
   ].slice(0, 5);
 
   const blockers: SummaryItem[] = [
     ...manualBlockers,
     ...jira.blockers,
+    ...teams.blockers,
+    ...hookBlockers,
   ].slice(0, 3);
 
   // ── Calendar: filter noise, keep notable meetings ─────────────────────────
@@ -396,6 +539,8 @@ export function generateWeeklySummary(weekStart?: string): WeeklySummaryData {
     days_active: activeDays.size,
     jira_count: entries.filter((e) => e.source === "jira").length,
     email_count: entries.filter((e) => e.source === "email").length,
+    teams_count: entries.filter((e) => e.source === "teams").length,
+    hook_count: entries.filter((e) => e.source === "hook").length,
   };
 
   const narrative = buildNarrative(highlights, lowlights, blockers, meetings, stats);
